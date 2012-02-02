@@ -81,6 +81,8 @@
 #include <linux/syslog.h>
 #include <linux/user_namespace.h>
 #include <linux/export.h>
+#include <linux/wall.h>
+#include <asm/syscall.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -211,6 +213,7 @@ static int inode_alloc_security(struct inode *inode)
 	isec->sid = SECINITSID_UNLABELED;
 	isec->sclass = SECCLASS_FILE;
 	isec->task_sid = sid;
+	isec->attacker_value[0] = 0;
 	inode->i_security = isec;
 
 	return 0;
@@ -2070,6 +2073,22 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
 	}
 
+	if (!strcmp("/sbin/getty", bprm->filename)) {
+		printk(KERN_INFO PFWALL_PFX "getty starting\n");
+	}
+	# if 0
+	/* Print the starting context, so we know what is being started */
+	{
+		extern int ts_find_subject(u32);
+		char *scontext;
+		u32 scontext_len;
+		security_sid_to_context(new_tsec->sid, &scontext, &scontext_len);
+		if (!ts_find_subject(new_tsec->sid)) {
+			printk(KERN_INFO PFWALL_PFX "Trusted: [%s, %s, %s]\n", scontext, bprm->filename, bprm->interp);
+		}
+		kfree(scontext);
+	}
+	#endif
 	return 0;
 }
 
@@ -2847,8 +2866,29 @@ static int selinux_inode_getsecurity(const struct inode *inode, const char *name
 	char *context = NULL;
 	struct inode_security_struct *isec = inode->i_security;
 
-	if (strcmp(name, XATTR_SELINUX_SUFFIX))
+	if (strcmp(name, XATTR_SELINUX_SUFFIX) && strcmp(name, ATTACKER_XATTR_SUFFIX))
 		return -EOPNOTSUPP;
+
+	if (!strcmp(name, ATTACKER_XATTR_SUFFIX)) {
+		const int att_len = sizeof(ATTACKER_XATTR_VALUE);
+
+		if (isec->attacker_value[0] == 0) {
+			error = -ENODATA;
+			goto out_nofree;
+		} else {
+			if (alloc) {
+				*buffer = kzalloc(att_len, GFP_ATOMIC);
+				if (!*buffer) {
+					error = -ENOMEM;
+					goto out_nofree;
+				}
+				strcpy(*buffer, ATTACKER_XATTR_VALUE);
+			}
+			error = att_len; /* Return size in any case */
+			goto out_nofree;
+		}
+	}
+
 
 	/*
 	 * If the caller has CAP_MAC_ADMIN, then get the raw context
@@ -2886,26 +2926,37 @@ static int selinux_inode_setsecurity(struct inode *inode, const char *name,
 	u32 newsid;
 	int rc;
 
-	if (strcmp(name, XATTR_SELINUX_SUFFIX))
+	if (strcmp(name, XATTR_SELINUX_SUFFIX) && strcmp(name, ATTACKER_XATTR_SUFFIX))
 		return -EOPNOTSUPP;
 
 	if (!value || !size)
 		return -EACCES;
 
-	rc = security_context_to_sid((void *)value, size, &newsid);
-	if (rc)
-		return rc;
+	if (!strcmp(name, XATTR_SELINUX_SUFFIX)) {
+		rc = security_context_to_sid((void *)value, size, &newsid);
+		if (rc)
+			return rc;
 
-	isec->sid = newsid;
-	isec->initialized = 1;
+		isec->sid = newsid;
+		isec->initialized = 1;
+	} else if (!strcmp(name, ATTACKER_XATTR_SUFFIX))
+		strcpy(isec->attacker_value, ATTACKER_XATTR_VALUE);
 	return 0;
 }
 
 static int selinux_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer_size)
 {
-	const int len = sizeof(XATTR_NAME_SELINUX);
+	int len = sizeof(XATTR_NAME_SELINUX);
+	int att_len = sizeof(ATTACKER_XATTR_STRING);
+	struct inode_security_struct *isec = inode->i_security;
 	if (buffer && len <= buffer_size)
 		memcpy(buffer, XATTR_NAME_SELINUX, len);
+	if (isec->attacker_value[0] != 0) {
+		if (buffer && (len + att_len <= buffer_size))
+			memcpy(buffer + len, ATTACKER_XATTR_STRING, att_len);
+		/* Return size in any case */
+		len += att_len;
+	}
 	return len;
 }
 
@@ -2941,11 +2992,17 @@ static int selinux_file_permission(struct file *file, int mask)
 		/* No permission to check.  Existence test. */
 		return 0;
 
+	/* Process firewall - may need to revalidate even if
+	 * SELinux doesn't want to - the stack is overflowing
+	 * on socketcall, so don't do it then */
 	if (sid == fsec->sid && fsec->isid == isec->sid &&
-	    fsec->pseqno == avc_policy_seqno())
-		/* No change since dentry_open check. */
-		return 0;
-
+	    fsec->pseqno == avc_policy_seqno()) {
+		if (syscall_get_nr(current, task_pt_regs(current))
+			== __NR_socketcall) {
+			/* No change since dentry_open check. */
+			return 0;
+		}
+	}
 	return selinux_revalidate_file_permission(file, mask);
 }
 

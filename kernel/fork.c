@@ -153,6 +153,10 @@ struct kmem_cache *vm_area_cachep;
 /* SLAB cache for mm_struct structures (tsk->mm) */
 static struct kmem_cache *mm_cachep;
 
+/* SLAB cache for pf_packet_context structures (tsk->p) */
+struct	kmem_cache *pf_packet_context_cachep;
+EXPORT_SYMBOL(pf_packet_context_cachep);
+
 static void account_kernel_stack(struct thread_info *ti, int account)
 {
 	struct zone *zone = page_zone(virt_to_page(ti));
@@ -1206,6 +1210,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->memcg_batch.memcg = NULL;
 #endif
 
+	/* Process firewall packet context */
+	p->p = NULL;
+	p->p = kmem_cache_alloc(pf_packet_context_cachep, GFP_KERNEL);
+	memset(&(p->dict_htable), 0, sizeof(struct hlist_head) * (1 << 8));
+	p->kernel_request = 0;
+
 	/* Perform scheduler related setup. Assign this task to a CPU. */
 	sched_fork(p);
 
@@ -1458,6 +1468,9 @@ struct task_struct * __cpuinit fork_idle(int cpu)
  * It copies the process, and if successful kick-starts
  * it and waits for it to finish using the VM if required.
  */
+
+PFW_PERF_INIT(sys_fork);
+
 long do_fork(unsigned long clone_flags,
 	      unsigned long stack_start,
 	      struct pt_regs *regs,
@@ -1469,6 +1482,7 @@ long do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long nr;
 
+	PFW_PERF_START(sys_fork);
 	/*
 	 * Do some preliminary argument and permissions checking before we
 	 * actually start allocating stuff
@@ -1548,6 +1562,7 @@ long do_fork(unsigned long clone_flags,
 	} else {
 		nr = PTR_ERR(p);
 	}
+	PFW_PERF_END(sys_fork);
 	return nr;
 }
 
@@ -1589,6 +1604,11 @@ void __init proc_caches_init(void)
 			sizeof(struct mm_struct), ARCH_MIN_MMSTRUCT_ALIGN,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, NULL);
 	vm_area_cachep = KMEM_CACHE(vm_area_struct, SLAB_PANIC);
+
+	pf_packet_context_cachep = kmem_cache_create("pf_packet_context_cache",
+			sizeof(struct pf_packet_context), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, NULL);
+
 	mmap_init();
 	nsproxy_cache_init();
 }

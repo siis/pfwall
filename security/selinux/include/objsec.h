@@ -27,6 +27,8 @@
 #include "flask.h"
 #include "avc.h"
 
+#define ATTACKER_XATTR_VALUE "1"
+
 struct task_security_struct {
 	u32 osid;		/* SID prior to last execve */
 	u32 sid;		/* current SID */
@@ -43,6 +45,7 @@ struct inode_security_struct {
 	u32 sid;		/* SID of this object */
 	u16 sclass;		/* security class of this object */
 	unsigned char initialized;	/* initialization flag */
+	char attacker_value[sizeof(ATTACKER_XATTR_VALUE)]; /* security.attacker */
 	struct mutex lock;
 };
 

@@ -33,6 +33,20 @@
 #include "avc_ss.h"
 #include "classmap.h"
 
+#include <linux/uaccess.h>
+#include <linux/syscalls.h>
+#include <linux/file.h>
+#include <linux/fcntl.h>
+#include <linux/limits.h>
+#include <linux/dcache.h>
+#include <linux/spinlock.h>
+#include <linux/debugfs.h>
+#include <linux/hardirq.h>
+#include <linux/wall.h>
+#include <asm/processor.h>
+#include <asm/msr.h>
+#include "avc.h"
+
 #define AVC_CACHE_SLOTS			512
 #define AVC_DEF_CACHE_THRESHOLD		512
 #define AVC_CACHE_RECLAIM		16
@@ -159,6 +173,7 @@ static void avc_dump_query(struct audit_buffer *ab, u32 ssid, u32 tsid, u16 tcla
 	audit_log_format(ab, " tclass=%s", secclass_map[tclass-1].name);
 }
 
+
 /**
  * avc_init - Initialize the AVC.
  *
@@ -180,6 +195,13 @@ void __init avc_init(void)
 
 	audit_log(current->audit_context, GFP_KERNEL, AUDIT_KERNEL, "AVC INITIALIZED\n");
 }
+
+static int __init wall_interfaces_init(void)
+{
+	/* Also initialize wall_interfaces */
+	return 0;
+}
+fs_initcall(wall_interfaces_init);
 
 int avc_get_hash_stats(char *page)
 {
@@ -552,7 +574,7 @@ int avc_audit(u32 ssid, u32 tsid,
  * @perms: permissions
  *
  * Register a callback function for events in the set @events
- * related to the SID pair (@ssid, @tsid) 
+ * related to the SID pair (@ssid, @tsid)
  * and the permissions @perms, interpreting
  * @perms based on @tclass.  Returns %0 on success or
  * -%ENOMEM if insufficient memory exists to add the callback.
@@ -789,6 +811,25 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid,
 	return rc;
 }
 
+int copy_last_frame_addr(void *to) {
+	int ret;
+
+	const struct pt_regs *regs = task_pt_regs(current);
+	const void __user *fr = (const void __user *)regs->sp;
+
+	if(!access_ok(VERIFY_READ, fr, sizeof(long)*4))
+	       return 0;
+
+	ret = 1;
+	pagefault_disable();
+	if(__copy_from_user_inatomic(to, fr + 4*sizeof(long), sizeof(long)))
+		return 0;
+	pagefault_enable();
+
+	return ret;
+
+}
+
 /**
  * avc_has_perm - Check permissions and perform any appropriate auditing.
  * @ssid: source security identifier
@@ -812,13 +853,45 @@ int avc_has_perm_flags(u32 ssid, u32 tsid, u16 tclass,
 {
 	struct av_decision avd;
 	int rc, rc2;
+	int denied; /* Was our request denied by SELinux or not?
+		       Different from rc of
+		       avc_has_perm_noaudit because we may be running in permissive
+		       mode and then it always returns success */
 
 	rc = avc_has_perm_noaudit(ssid, tsid, tclass, requested, 0, &avd);
 
+	denied = requested & ~(avd.allowed);
 	rc2 = avc_audit(ssid, tsid, tclass, requested, &avd, rc, auditdata,
 			flags);
 	if (rc2)
 		return rc2;
+
+	/* If SELinux did not deny and did not have a problem,
+	 * query the process firewall */
+
+	if (!denied && rc >= 0) {
+		if (((requested - 1) & requested) == 0) {
+			if (read_like(tclass, requested)) {
+				rc = pfwall_check(PF_HOOK_INPUT, ssid, tsid, (u32) tclass, requested, auditdata);
+			} else {
+				rc = pfwall_check(PF_HOOK_OUTPUT, ssid, tsid, (u32) tclass, requested, auditdata);
+			}
+		} else {
+			/* For each of the requested bits */
+			int pind, pow = 1;
+			for (pind = 0; pind < 32; pind++, pow = pow << 1) {
+				if (pow & requested) {
+					if (read_like(tclass, pow & requested)) {
+						rc = pfwall_check(PF_HOOK_INPUT, ssid, tsid, (u32) tclass, pow & requested, auditdata);
+					} else {
+						rc = pfwall_check(PF_HOOK_OUTPUT, ssid, tsid, (u32) tclass, pow & requested, auditdata);
+					}
+					if (rc < 0)
+						break;
+				}
+			}
+		}
+	}
 	return rc;
 }
 

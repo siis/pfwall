@@ -507,9 +507,16 @@ ENTRY(system_call)
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 syscall_call:
+	pushl %eax			/* All syscall args are on the stack,
+	* the only one that we need to preserve from clobbering
+	* is %eax. Save it. */
+	call pf_packet_allocate
+	# movl PT_EAX(%esp),%eax		/* reload syscall number */
+	popl %eax			/* Restore sysacll number */
 	call *sys_call_table(,%eax,4)
 	movl %eax,PT_EAX(%esp)		# store the return value
 syscall_exit:
+	call pf_packet_free
 	LOCKDEP_SYS_EXIT
 	DISABLE_INTERRUPTS(CLBR_ANY)	# make sure we don't miss an interrupt
 					# setting need_resched or sigpending

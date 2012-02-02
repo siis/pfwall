@@ -30,6 +30,8 @@
 #include <linux/list.h>
 #include <linux/hash.h>
 #include <linux/rcupdate.h>
+#include <linux/wall.h>
+#include <linux/relay.h>
 
 #include <trace/events/sched.h>
 
@@ -4242,4 +4244,5 @@ void ftrace_graph_stop(void)
 {
 	ftrace_stop();
 }
+
 #endif

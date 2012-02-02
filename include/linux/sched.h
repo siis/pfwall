@@ -1572,6 +1572,14 @@ struct task_struct {
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 	atomic_t ptrace_bp_refcnt;
 #endif
+	/* Process firewall "packet" */
+	struct pf_packet_context *p;
+
+	/* Arbitrary process state */
+	struct hlist_head dict_htable[1 << 8]; /* 1 << DICT_HASH_BITS */
+
+	/* Are we in a kernel request - Process firewall is not called for these */
+	int kernel_request;
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */

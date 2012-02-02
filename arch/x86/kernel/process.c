@@ -23,6 +23,10 @@
 #include <asm/i387.h>
 #include <asm/debugreg.h>
 
+#include <linux/wall.h>
+#include <linux/namei.h>
+#include <linux/fs_struct.h>
+
 struct kmem_cache *task_xstate_cachep;
 EXPORT_SYMBOL_GPL(task_xstate_cachep);
 
@@ -300,6 +304,42 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 }
 EXPORT_SYMBOL(kernel_thread);
 
+#if 0
+/* Perl is included because of it always having . as the last part of its @INC */
+char *uprogs[] = { "perl", "ls", "find", "cp", "mv", "rm", "chmod",
+	"grep", "tar", "mkdir", "ln", "setfiles", "awk", "sed", "touch", 0 };
+
+/* TODO: Make this into a dictionary and a match module */
+static int in_utility_programs(char *comm)
+{
+	int i = 0 ;
+	for (i = 0; uprogs[i]; i++)
+		if (!strcmp(comm, uprogs[i]))
+			return 1;
+	return 0;
+}
+
+static int chdir_task(struct task_struct *task, char *filename)
+{
+	struct path path;
+	int error;
+	mm_segment_t old_fs = get_fs();
+
+	PFW_SYSCALL(error = user_path_dir(filename, &path));
+	if (error)
+		goto out;
+
+	set_fs_pwd(task->fs, &path);
+
+	path_put(&path);
+out:
+	return error;
+
+}
+#endif
+
+PFW_PERF_INIT(sys_execve);
+
 /*
  * sys_execve() executes a new program.
  */
@@ -310,6 +350,7 @@ long sys_execve(const char __user *name,
 	long error;
 	char *filename;
 
+	PFW_PERF_START(sys_execve);
 	filename = getname(name);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
@@ -324,6 +365,21 @@ long sys_execve(const char __user *name,
 #endif
 
 	putname(filename);
+	PFW_PERF_END(sys_execve);
+
+	/* Change fs->pwd to /home/attacker */
+	# if 0
+	if (pfwall_enabled) {
+		/* Additional constraints */
+		/* Utility programs are run from bash scripts which chdir to
+		   the right directory before forking and execing them with
+		   relative paths as arguments. E.g., chdir /safe && ls . .
+		   We don't want to flag these programs */
+		if (!in_utility_programs(current->comm)) {
+			chdir_task(current, ATTACKER_HOMEDIR);
+		}
+	}
+	# endif
 	return error;
 }
 

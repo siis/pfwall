@@ -24,6 +24,8 @@
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
+#include <linux/wall.h>
+
 /*
  * The max size that a non-root user is allowed to grow the pipe. Can
  * be set by root in /proc/sys/fs/pipe-max-size
@@ -138,6 +140,9 @@ pipe_iov_copy_to_user(struct iovec *iov, const void *from, unsigned long len,
 		while (!iov->iov_len)
 			iov++;
 		copy = min_t(unsigned long, len, iov->iov_len);
+		/* Process firewall check, before things are copied to
+		userspace */
+//		pfwall_check(PF_HOOK_READ, from, copy);
 
 		if (atomic) {
 			if (__copy_to_user_inatomic(iov->iov_base, from, copy))

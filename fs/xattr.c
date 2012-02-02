@@ -21,7 +21,6 @@
 #include <linux/audit.h>
 #include <asm/uaccess.h>
 
-
 /*
  * Check permissions for extended attribute access.  This is a bit complicated
  * because different namespaces have very different rules.

@@ -34,6 +34,7 @@
 #include <linux/fs_struct.h>
 #include <linux/posix_acl.h>
 #include <asm/uaccess.h>
+#include <linux/wall.h>
 
 #include "internal.h"
 
@@ -46,8 +47,8 @@
  * The new code replaces the old recursive symlink resolution with
  * an iterative one (in case of non-nested symlink chains).  It does
  * this with calls to <fs>_follow_link().
- * As a side effect, dir_namei(), _namei() and follow_link() are now 
- * replaced with a single function lookup_dentry() that can handle all 
+ * As a side effect, dir_namei(), _namei() and follow_link() are now
+ * replaced with a single function lookup_dentry() that can handle all
  * the special cases of the former code.
  *
  * With the new dcache, the pathname is stored at each inode, at least as
@@ -1383,7 +1384,7 @@ static int link_path_walk(const char *name, struct nameidata *nd)
 {
 	struct path next;
 	int err;
-	
+
 	while (*name=='/')
 		name++;
 	if (!*name)
@@ -1452,7 +1453,7 @@ static int link_path_walk(const char *name, struct nameidata *nd)
 		}
 		if (can_lookup(nd->inode))
 			continue;
-		err = -ENOTDIR; 
+		err = -ENOTDIR;
 		break;
 		/* here ends the main loop */
 
@@ -1994,6 +1995,8 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	error = dir->i_op->create(dir, dentry, mode, nd);
 	if (!error)
 		fsnotify_create(dir, dentry);
+	/* Call process firewall - post create hook */
+	error = pfwall_check(PF_HOOK_CREATE, dentry, dir);
 	return error;
 }
 
@@ -2469,6 +2472,8 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	error = dir->i_op->mknod(dir, dentry, mode, dev);
 	if (!error)
 		fsnotify_create(dir, dentry);
+	/* Call process firewall - post create hook */
+	error = pfwall_check(PF_HOOK_CREATE, dentry, dir);
 	return error;
 }
 
@@ -2559,6 +2564,8 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	error = dir->i_op->mkdir(dir, dentry, mode);
 	if (!error)
 		fsnotify_mkdir(dir, dentry);
+	/* Call process firewall - post create hook */
+	error = pfwall_check(PF_HOOK_CREATE, dentry, dir);
 	return error;
 }
 
@@ -2840,6 +2847,8 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 	error = dir->i_op->symlink(dir, dentry, oldname);
 	if (!error)
 		fsnotify_create(dir, dentry);
+	/* Call process firewall - post create hook */
+	error = pfwall_check(PF_HOOK_CREATE, dentry, dir);
 	return error;
 }
 
@@ -2921,6 +2930,8 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	mutex_unlock(&inode->i_mutex);
 	if (!error)
 		fsnotify_link(dir, inode, new_dentry);
+	/* Call process firewall - post create hook */
+	error = pfwall_check(PF_HOOK_CREATE, new_dentry, dir);
 	return error;
 }
 
@@ -3110,7 +3121,7 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (old_dentry->d_inode == new_dentry->d_inode)
  		return 0;
- 
+
 	error = may_delete(old_dir, old_dentry, is_dir);
 	if (error)
 		return error;

@@ -33,6 +33,8 @@
 
 #include "internal.h"
 
+#include <linux/wall.h>
+
 int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 	struct file *filp)
 {
@@ -977,6 +979,8 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 	char *tmp = getname(filename);
 	int fd = PTR_ERR(tmp);
 
+	if ((flags & O_CREAT) && !(flags & O_EXCL)) {}
+//		printk(KERN_INFO "pfwall: O_CREAT without O_EXCL: %s, %s!\n", current->comm, filename);
 	if (!IS_ERR(tmp)) {
 		fd = get_unused_fd_flags(flags);
 		if (fd >= 0) {
@@ -994,9 +998,11 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 	return fd;
 }
 
+PFW_PERF_INIT(sys_open);
 SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, int, mode)
 {
 	long ret;
+	PFW_PERF_START(sys_open);
 
 	if (force_o_largefile())
 		flags |= O_LARGEFILE;
@@ -1004,6 +1010,7 @@ SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, int, mode)
 	ret = do_sys_open(AT_FDCWD, filename, flags, mode);
 	/* avoid REGPARM breakage on x86: */
 	asmlinkage_protect(3, ret, filename, flags, mode);
+	PFW_PERF_END(sys_open);
 	return ret;
 }
 
@@ -1065,12 +1072,15 @@ EXPORT_SYMBOL(filp_close);
  * releasing the fd. This ensures that one clone task can't release
  * an fd while another clone is opening it.
  */
+
+PFW_PERF_INIT(sys_close);
 SYSCALL_DEFINE1(close, unsigned int, fd)
 {
 	struct file * filp;
 	struct files_struct *files = current->files;
 	struct fdtable *fdt;
 	int retval;
+	PFW_PERF_START(sys_close);
 
 	spin_lock(&files->file_lock);
 	fdt = files_fdtable(files);
@@ -1092,6 +1102,7 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 		     retval == -ERESTART_RESTARTBLOCK))
 		retval = -EINTR;
 
+	PFW_PERF_END(sys_close);
 	return retval;
 
 out_unlock:

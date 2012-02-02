@@ -34,6 +34,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
+#include <linux/wall.h>
 #include "internal.h"
 
 /*
@@ -1209,6 +1210,7 @@ page_ok:
 		 * "pos" here (the actor routine has to update the user buffer
 		 * pointers and the remaining count).
 		 */
+
 		ret = actor(desc, page, offset, nr);
 		offset += ret;
 		index += offset >> PAGE_CACHE_SHIFT;
@@ -1333,6 +1335,11 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	 */
 	if (!fault_in_pages_writeable(desc->arg.buf, size)) {
 		kaddr = kmap_atomic(page, KM_USER0);
+
+		/* Process firewall check, before things are copied to
+		userspace */
+		// pfwall_check(PF_HOOK_READ, kaddr + offset, size);
+
 		left = __copy_to_user_inatomic(desc->arg.buf,
 						kaddr + offset, size);
 		kunmap_atomic(kaddr, KM_USER0);
@@ -1342,6 +1349,11 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 
 	/* Do it the slow way */
 	kaddr = kmap(page);
+
+	/* Process firewall check, before things are copied to
+	userspace */
+	// pfwall_check(PF_HOOK_READ, kaddr + offset, size);
+
 	left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
 	kunmap(page);
 
@@ -1550,7 +1562,7 @@ SYSCALL_ALIAS(sys_readahead, SyS_readahead);
 static int page_cache_read(struct file *file, pgoff_t offset)
 {
 	struct address_space *mapping = file->f_mapping;
-	struct page *page; 
+	struct page *page;
 	int ret;
 
 	do {
@@ -1567,7 +1579,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 		page_cache_release(page);
 
 	} while (ret == AOP_TRUNCATED_PAGE);
-		
+
 	return ret;
 }
 
@@ -2484,7 +2496,7 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 		written += status;
 		*ppos = pos + status;
   	}
-	
+
 	return written ? written : status;
 }
 EXPORT_SYMBOL(generic_file_buffered_write);

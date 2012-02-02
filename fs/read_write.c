@@ -19,6 +19,9 @@
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
+#include <linux/vmalloc.h>
+
+#include <linux/wall.h>
 
 const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
@@ -457,12 +460,14 @@ static inline void file_pos_write(struct file *file, loff_t pos)
 	file->f_pos = pos;
 }
 
+PFW_PERF_INIT(sys_read);
 SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
 	int fput_needed;
 
+	PFW_PERF_START(sys_read);
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
@@ -471,9 +476,11 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 		fput_light(file, fput_needed);
 	}
 
+	PFW_PERF_END(sys_read);
 	return ret;
 }
 
+PFW_PERF_INIT(sys_write);
 SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 		size_t, count)
 {
@@ -481,6 +488,7 @@ SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 	ssize_t ret = -EBADF;
 	int fput_needed;
 
+	PFW_PERF_START(sys_write);
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		loff_t pos = file_pos_read(file);
@@ -489,6 +497,7 @@ SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 		fput_light(file, fput_needed);
 	}
 
+	PFW_PERF_END(sys_write);
 	return ret;
 }
 

@@ -37,6 +37,8 @@
 #include <linux/init_task.h>
 #include <linux/syscalls.h>
 
+#include <linux/wall.h>
+
 #define pid_hashfn(nr, ns)	\
 	hash_long((unsigned long)nr + (unsigned long)ns, pidhash_shift)
 static struct hlist_head *pid_hash;
@@ -465,16 +467,19 @@ struct pid *find_get_pid(pid_t nr)
 }
 EXPORT_SYMBOL_GPL(find_get_pid);
 
+PFW_PERF_INIT(sys_getpid);
 pid_t pid_nr_ns(struct pid *pid, struct pid_namespace *ns)
 {
 	struct upid *upid;
 	pid_t nr = 0;
+	PFW_PERF_START(sys_getpid);
 
 	if (pid && ns->level <= pid->level) {
 		upid = &pid->numbers[ns->level];
 		if (upid->ns == ns)
 			nr = upid->nr;
 	}
+	PFW_PERF_END(sys_getpid);
 	return nr;
 }
 
