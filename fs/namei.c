@@ -1828,7 +1828,7 @@ int user_path_at(int dfd, const char __user *name, unsigned flags,
 	return user_path_at_empty(dfd, name, flags, path, 0);
 }
 
-static int user_path_parent(int dfd, const char __user *path,
+int user_path_parent(int dfd, const char __user *path,
 			struct nameidata *nd, char **name)
 {
 	char *s = getname(path);
@@ -1845,6 +1845,7 @@ static int user_path_parent(int dfd, const char __user *path,
 
 	return error;
 }
+EXPORT_SYMBOL(user_path_parent);
 
 /*
  * It's inline, so penalty for filesystems that don't use sticky bit is

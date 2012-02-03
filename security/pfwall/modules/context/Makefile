@@ -1,3 +1,3 @@
 # EXTRA_CFLAGS	+= -O0
 
-obj-y	+= data.o syscall.o interpreter.o stacktrace.o syscall_filename.o
+obj-y	+= data.o syscall.o stacktrace.o syscall_filename.o #interpreter.o

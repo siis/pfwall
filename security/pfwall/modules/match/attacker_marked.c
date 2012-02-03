@@ -2,8 +2,6 @@
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
-#include <linux/suspend.h>
-#include <linux/debugfs.h>
 #include <linux/hardirq.h>
 #include <linux/kthread.h>
 #include <linux/uaccess.h>
@@ -22,6 +20,9 @@
 #include <linux/lsm_audit.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
+#include <linux/socket.h>
+#include <net/sock.h>
+#include <net/af_unix.h>
 
 #if 0
 /* TODO: follow as flag */
@@ -97,20 +98,34 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 	struct dentry *dentry = NULL;
 	struct inode *inode = NULL;
 	char value[4]; /* The value set should be "1" */
+	struct common_audit_data *a = p->auditdata;
 
-	if (p->auditdata) {
-		switch (p->auditdata->type) {
-		case LSM_AUDIT_DATA_FS:
-			if (p->auditdata->u.fs.path.dentry) {
-				dentry = p->auditdata->u.fs.path.dentry;
-				inode = dentry->d_inode;
-			} else if (p->auditdata->u.fs.inode) {
-				inode = p->auditdata->u.fs.inode;
-				dentry = d_find_alias(inode);
+	if (a) {
+		switch (a->type) {
+			case LSM_AUDIT_DATA_DENTRY: {
+				dentry = a->u.dentry;
+				inode = a->u.dentry->d_inode;
+				break;
 			}
+			case LSM_AUDIT_DATA_INODE: {
+				inode = a->u.inode;
+				dentry = d_find_alias(inode);
+				break;
+			}
+			case LSM_AUDIT_DATA_NET: {
+				if (a->u.net.sk) {
+					struct sock *sk = a->u.net.sk;
+					struct unix_sock *u;
 
-		break;
-		default:
+					if (sk->sk_family == AF_UNIX) {
+						u = unix_sk(sk);
+						dentry = u->dentry;
+						inode = dentry->d_inode;
+						break;
+					}
+				}
+			}
+			default:
 			;
 		}
 	}
@@ -121,6 +136,8 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 		/* What to do? */
 	}
 
+	if (a->type == LSM_AUDIT_DATA_INODE)
+		dput(dentry);
 	return (error > 0 || error == -ERANGE) ? 1 : 0;
 
 }

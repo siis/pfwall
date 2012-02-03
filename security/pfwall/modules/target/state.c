@@ -2,10 +2,7 @@
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
-#include <linux/suspend.h>
-#include <linux/debugfs.h>
 #include <linux/hardirq.h>
-#include <linux/kthread.h>
 #include <linux/uaccess.h>
 #include <linux/ftrace.h>
 #include <linux/sysctl.h>

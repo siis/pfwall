@@ -21,18 +21,6 @@
 #include <linux/stat.h>
 #include <linux/un.h>
 
-#if 0
-int first_arg_set[] = {5, 8, 9, 10, /* 11,*/ 12, 14, 15, 21, 30, 38, 39, 40, 61, 83, 85, 92, 182, 193, 198, 212, 217, 271, /* check */ 106, 107, 195, 196, 226, 227, 229, 230, 232, 233, 235, 236, -1};
-
-int second_arg_set[] = {292, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 320 /* TODO: __NR_socketcall */, -1};
-#endif
-
-int check_set[] = {106, 107, 195, 196, 300, 307, -1};
-
-int create_set[] = {5, 8, 9, 14, 38, 39, 83, 295, 296, 297, 303, 304, -1};
-
-int use_set[] = {/* 10, */ 12, 15, 21, 30, 38, 40, 85, 92, 182, 193, 198, 212, 226, 227, 229, 230, 232, 233, 235, 236, 271, 298, 299, /* 301, */ 302, 305, 306, -1};
-
 /* Flags in the rule */
 #define SYMLINK 0x1
 #define HARDLINK 0x2
@@ -66,30 +54,6 @@ struct pft_fuzz_resource_target
 	int check_find;
 };
 
-
-static int bind_call(int sn)
-{
-	struct pt_regs *ptregs = (struct pt_regs *)
-			(current->thread.sp0 - sizeof (struct pt_regs));
-	int call = (int) ptregs->bx;
-	if (sn == __NR_socketcall && call == SYS_BIND)
-		return 1;
-	else
-		return 0;
-
-}
-
-static int connect_call(int sn)
-{
-	struct pt_regs *ptregs = (struct pt_regs *)
-			(current->thread.sp0 - sizeof (struct pt_regs));
-	int call = (int) ptregs->bx;
-	if (sn == __NR_socketcall && call == SYS_CONNECT)
-		return 1;
-	else
-		return 0;
-
-}
 
 /* Returns 0 if already checked */
 int check_already_attacked(char __user *filename, int follow)
@@ -582,7 +546,6 @@ int should_skip(char __user *filename)
 	return 0;
 }
 
-
 int pft_fuzz_resource_target(struct pf_packet_context *p, void *target_specific_data)
 {
 	int tret = 0;
@@ -608,6 +571,7 @@ int pft_fuzz_resource_target(struct pf_packet_context *p, void *target_specific_
 	if (tret == 0)
 		goto out;
 
+	/* TODO: Can we model this in terms of in_set() alone? */
 	if (rt->flags & SYMLINK) {
 		if (in_set(sn, create_set) || bind_call(sn)) {
 			if (((sn == __NR_open) && (ptregs->cx & O_CREAT)

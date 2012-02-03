@@ -22,7 +22,7 @@
 bool pft_signal_match(struct pf_packet_context *p, void *match_specific_data)
 {
 	int si_code = 0;
-	struct sigpending *list;
+	struct sigpending *list = NULL;
 	struct sigqueue *q;
 	__sighandler_t h = NULL;
 

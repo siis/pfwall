@@ -18,14 +18,7 @@
 #include <linux/relay.h>
 #include <linux/un.h>
 
-// notin: 33, 54, 87, 99, 102, 133, 268,
-// in: 92, 182, 193, 198, 217, 296, 297, 299, 302, 106, 107, 232, 233, 235, 236,
-int first_arg_set[] = {5, 8, 9, 10, /* 11,*/ 12, 14, 15, 21, 30, 38, 39, 40, 61, 83, 85, 92, 99, 182, 193, 198, 212, 217, 271, /* check */ 106, 107, 195, 196, 226, 227, 229, 230, 232, 233, 235, 236, 268, 304, -1};
-
-int second_arg_set[] = {292, 295, 296, 297, 298, 299, 300, 301, 302, 303, 305, 306, 307, 320 /* TODO: __NR_socketcall */, -1};
-
 /* For socketcalls */
-
 #define AL(x) ((x) * sizeof(unsigned long))
 static const unsigned char nargs[20] = {
 	AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),

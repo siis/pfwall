@@ -2,7 +2,6 @@
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
-#include <linux/suspend.h>
 #include <linux/debugfs.h>
 #include <linux/hardirq.h>
 #include <linux/kthread.h>
@@ -20,6 +19,8 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/stacktrace.h>
+#include <linux/module.h>
+#include <asm/stacktrace.h>
 
 #include <trace/events/sched.h>
 
@@ -196,7 +197,7 @@ unlock:
 int pf_register_match(struct pft_match_module *m_orig)
 {
 	int ret = 0;
-	struct pft_match_module *tmp, *m;
+	struct pft_match_module *tmp, *m = NULL;
 	struct list_head *lht;
 
 	/* TODO: See pf_register_target below */
@@ -244,7 +245,7 @@ unlock:
 int pf_register_target(struct pft_target_module *t_orig)
 {
 	int ret = 0;
-	struct pft_target_module *tmp, *t;
+	struct pft_target_module *tmp, *t = NULL;
 	struct list_head *lht;
 
 	/* TODO: Locking, should the caller get the lock?
@@ -392,48 +393,46 @@ end:
 static int pf_translate_inode(struct pft_entry *e)
 {
 	#ifdef PFWALL_MATCH_REPR
-	struct nameidata ni;
+	struct path bin_p;
 	int ret = 0;
 
 	if (strlen(e->def.binary_path) > 0) {
 		/* Get inode given path and store that in the union */
-		ret = path_lookup(e->def.binary_path, LOOKUP_FOLLOW, &ni);
+		ret = kern_path(e->def.binary_path, LOOKUP_FOLLOW, &bin_p);
 		if (ret < 0) {
 			printk(KERN_INFO PFWALL_PFX
 				"Path lookup translation failed for binary path: %s: %d\n", e->def.binary_path, ret);
 			return ret;
 		}
-		e->def.binary_inoden = ni.path.dentry->d_inode->i_ino;
-	//	path_release(&ni);
+		e->def.binary_inoden = bin_p.dentry->d_inode->i_ino;
 	} else {
 		e->def.binary_inoden = 0;
 	}
 
 	if (strlen(e->def.vm_area_name) > 0) {
-		ret = path_lookup(e->def.vm_area_name, LOOKUP_FOLLOW, &ni);
+		ret = kern_path(e->def.vm_area_name, LOOKUP_FOLLOW, &bin_p);
 		if (ret < 0) {
 			printk(KERN_INFO PFWALL_PFX
 				"Path lookup translation failed for vm area file\n");
 			return ret;
 		}
-		e->def.vm_area_inoden = ni.path.dentry->d_inode->i_ino;
-	//	path_release(&ni);
+		e->def.vm_area_inoden = bin_p.dentry->d_inode->i_ino;
 	} else {
 		e->def.vm_area_inoden = 0;
 	}
 
 	if (strlen(e->def.script_path) > 0) {
-		ret = path_lookup(e->def.script_path, LOOKUP_FOLLOW, &ni);
+		ret = kern_path(e->def.script_path, LOOKUP_FOLLOW, &bin_p);
 		if (ret < 0) {
 			printk(KERN_INFO PFWALL_PFX
 				"Path lookup translation failed for script file\n");
 			return ret;
 		}
-		e->def.script_inoden = ni.path.dentry->d_inode->i_ino;
-	//	path_release(&ni);
+		e->def.script_inoden = bin_p.dentry->d_inode->i_ino;
 	} else {
 		e->def.script_inoden = 0;
 	}
+	path_put(&bin_p);
 
 	return ret;
 	#endif
@@ -478,7 +477,7 @@ static int pf_translate_sid(struct pft_entry *e)
 static int pf_translate_chain(struct pft_table *t, struct pft_entry *chain_start)
 {
 	int ret = 0, break_l = 0;
-	struct pft_entry *e, *e_lookahead;
+	struct pft_entry *e, *e_lookahead = NULL;
 	e = (struct pft_entry *) chain_start;
 	do {
 		if (e->next_offset == 0)
@@ -579,9 +578,8 @@ int pft_return_target(struct pf_packet_context *p, void *target_specific_data)
 	return PF_RETURN;
 }
 
-#if 0
-static int copy_stack_frame(const void __user *fp,
-			struct stack_frame *frame)
+static int copy_stack_frame_user(const void __user *fp,
+			struct stack_frame_user *frame)
 {
 	int ret;
 
@@ -606,11 +604,11 @@ static inline void __static_save_stack_trace_user(struct static_stack_trace *tra
 		trace->entries[trace->nr_entries++] = regs->ip;
 
 	while (trace->nr_entries < trace->max_entries) {
-		struct stack_frame frame;
+		struct stack_frame_user frame;
 
 		frame.next_fp = NULL;
 		frame.ret_addr = 0;
-		if (!copy_stack_frame(fp, &frame))
+		if (!copy_stack_frame_user(fp, &frame))
 			break;
 		if ((unsigned long)fp < regs->sp)
 			break;
@@ -635,7 +633,6 @@ void static_save_stack_trace_user(struct static_stack_trace *trace)
 	if (trace->nr_entries < trace->max_entries)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
 }
-#endif
 
 void pft_libc_nonshared(struct pf_packet_context *p)
 {
@@ -672,14 +669,14 @@ int pft_interface_context(struct pf_packet_context *p)
 	p->trace.max_entries	= MAX_NUM_FRAMES;
 	p->trace.skip		= 0;
 
-//	static_save_stack_trace_user(&(p->trace));
-//	pft_vm_area_inode_context(p);
+	static_save_stack_trace_user(&(p->trace));
+	pft_vm_area_inode_context(p);
 
 	/* Below is needed only for advanced stacktrace, where
 		unrolling of stack has to simultaneously take
 		place with the VM area, so debug info can be
 		retrieved.  However, this hurts performance */
-	ret = pft_stacktrace_and_vm_area_context(p);
+//	ret = pft_stacktrace_and_vm_area_context(p);
 	if (ret < 0)
 		goto end;
 
@@ -689,7 +686,7 @@ int pft_interface_context(struct pf_packet_context *p)
 	if (!(p->context & PF_CONTEXT_BINARY_PATH))
 		pft_binary_path_context(p);
 
-	ret = pft_interpreter_context(p);
+//	ret = pft_interpreter_context(p);
 end:
 	if (ret < 0 || p->trace_first_program_ip == -1) {
 //		printk(KERN_INFO PFWALL_PFX "p->trace_first_program_ip is invalid: %s\n", current->comm);

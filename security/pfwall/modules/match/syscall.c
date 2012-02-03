@@ -2,10 +2,7 @@
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
-#include <linux/suspend.h>
-#include <linux/debugfs.h>
 #include <linux/hardirq.h>
-#include <linux/kthread.h>
 #include <linux/uaccess.h>
 #include <linux/ftrace.h>
 #include <linux/sysctl.h>
@@ -42,7 +39,7 @@ bool pft_syscall_match(struct pf_packet_context *p, void *match_specific_data)
 	struct pt_regs *ptregs = (struct pt_regs *)
 			(current->thread.sp0 - sizeof (struct pt_regs));
 
-	int value;
+	int value = 0;
 	char *value_ptr;
 
 	switch(sm->arg_num) {

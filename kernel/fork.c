@@ -66,6 +66,7 @@
 #include <linux/user-return-notifier.h>
 #include <linux/oom.h>
 #include <linux/khugepaged.h>
+#include <linux/wall.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>

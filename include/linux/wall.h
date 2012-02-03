@@ -1,8 +1,8 @@
 #include <linux/limits.h>
-#include <linux/stacktrace.h>
 #include <linux/signal.h>
 #include <asm/syscall.h>
 #include <linux/net.h>
+#include <linux/module.h>
 
 #define NETLINK_WALL_VIOLATIONS 28
 
@@ -190,12 +190,17 @@ struct static_stack_trace {
 	unsigned long entries[MAX_NUM_FRAMES]; /* Address in memory */
 	int skip;
 };
-
+	
 struct interpreter_info {
 	unsigned int nr_entries, max_entries;
 	char script_filename[MAX_NUM_FRAMES][PAGE_SIZE];
 	unsigned long script_inoden[MAX_NUM_FRAMES];
 	unsigned long line_number[MAX_NUM_FRAMES];
+};
+
+struct stack_frame_user {
+	const void __user	*next_fp;
+	unsigned long		ret_addr;
 };
 
 
@@ -284,12 +289,6 @@ struct pft_default_matches
 	u16 tclass; /* SELinux object class */
 	u32 requested; /* SELinux operation */
 };
-
-struct stack_frame {
-	const void __user	*next_fp;
-	unsigned long		ret_addr;
-};
-
 
 /* Map of interface to index in array */
 
@@ -663,7 +662,7 @@ struct dwarf_fde
 #define ATTACKER_PREBIND 0x80
 /* If exists, then delete and create permissions, else just create permission */
 #define ATTACKER_BIND 0x100
-uid_t pft_get_uid_with_permission(int flags, char *filename);
+uid_t pft_get_uid_with_permission(int flags, const char __user *filename);
 
 /* syscall_invoked module */
 extern atomic_t pfw_syscalls_invoked[NR_syscalls + 1];
@@ -781,3 +780,15 @@ extern char *new_target_file;
 
 /* Credentials export user function */
 extern struct cred *set_creds(uid_t *);
+
+/* Information about system calls */
+
+extern int first_arg_set[];
+extern int second_arg_set[];
+extern int check_set[];
+extern int create_set[];
+extern int use_set[];
+extern int nosym_set[];
+extern int in_set(int sn, int *array);
+int bind_call(int sn);
+int connect_call(int sn);

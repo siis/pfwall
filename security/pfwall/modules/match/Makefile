@@ -1,4 +1,4 @@
-EXTRA_CFLAGS	+= -O0
+# EXTRA_CFLAGS	+= -O0
 
 obj-y	+= string.o
 obj-y	+= state.o

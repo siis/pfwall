@@ -176,49 +176,60 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
  * Returns uid if an attacker exists, 0 if not, -errno if error.
  */
 
-uid_t pft_get_uid_with_permission(int flags, char *filename)
+uid_t pft_get_uid_with_permission(int flags, const char __user *fname)
 {
-	int ret = 0, i, f_exist = -1, match = 0;
+	int ret = 0, i = 0, f_exist = -1, match = 0;
 	char *tmp;
 	/* TODO: Collapse p_nd and f_nd into one */
-	struct nameidata p_nd, f_nd;
+	struct path p_nd, f_nd;
 	struct cred *old_cred;
 	struct dentry *fdentry;
+	int dfd = AT_FDCWD;
+	int flag_follow = 0;
 
-	/* If no filename, exit immediately */
-	if (!filename)
+	struct nameidata par_nd;
+
+	/* If no fname, exit immediately */
+	if (!fname)
 		goto out;
 	/* Copy userspace string to kernel */
-	tmp = getname(filename);
+	/*
+	tmp = getname(fname);
 	if (IS_ERR(tmp)) {
 		ret = PTR_ERR(tmp);
 		goto out;
-	}
+	} */
 
 	/* If parent directory doesn't exist, exit immediately */
-	ret = path_lookup(tmp, LOOKUP_PARENT, &p_nd);
+	ret = user_path_parent(dfd, fname, &par_nd, &tmp);
+//	ret = path_lookup(tmp, LOOKUP_PARENT, &p_nd);
 	if (ret) {
 		/* Error */
 //		if (ret == -ENOENT)
-//			printk(KERN_INFO PFWALL_PFX "Directory creation: %s required for process: %s\n", filename, current->comm);
-		goto out_release_path;
+//			printk(KERN_INFO PFWALL_PFX "Directory creation: %s required for process: %s\n", fname, current->comm);
+		goto out;
 	}
+	putname(tmp);
 
 	/* Check if file already exists */
-	ret = path_lookup(tmp, LOOKUP_FOLLOW, &f_nd);
+	flag_follow = (in_set(syscall_get_nr(current,
+			task_pt_regs(current)), nosym_set)) ?
+			0 : LOOKUP_FOLLOW;
+	ret = user_path_at(dfd, fname, flag_follow, &f_nd);
+	// ret = path_lookup(tmp, LOOKUP_FOLLOW, &f_nd);
 	if (ret < 0 && ret != -ENOENT)
-		goto out_unlock;
+		goto out_put_ppath;
 	else if (ret == -ENOENT) {
 		f_exist = 0;
 		/* Create a dentry for the new file */
-		fdentry = lookup_create(&p_nd, 0);
+		fdentry = user_path_create(dfd, fname, &p_nd, 0);
 		if (IS_ERR(fdentry)) {
-			mutex_unlock(&p_nd.path.dentry->d_inode->i_mutex);
+//			mutex_unlock(&p_nd.path.dentry->d_inode->i_mutex);
 			ret = PTR_ERR(fdentry);
-			goto out_release_path;
+			goto out_put_ppath;
 		}
 	} else {
-		fdentry = f_nd.path.dentry;
+		fdentry = f_nd.dentry;
 		f_exist = 1;
 	}
 
@@ -258,18 +269,18 @@ next_iter:
 			break;
 	}
 
-out_unlock:
+// out_unlock:
 	if (!f_exist) {
-		mutex_unlock(&p_nd.path.dentry->d_inode->i_mutex);
-		path_put(&p_nd.path);
+		mutex_unlock(&p_nd.dentry->d_inode->i_mutex);
+		path_put(&p_nd);
 		dput(fdentry);
 	} else if (f_exist == 1) {
-		path_put(&p_nd.path);
-		path_put(&f_nd.path);
+		path_put(&p_nd);
+		path_put(&f_nd);
 	}
+out_put_ppath:
+	path_put(&par_nd.path);
 
-out_release_path:
-	putname(tmp);
 out:
 	if (ret < 0)
 		return ret;

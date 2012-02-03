@@ -2,10 +2,8 @@
 #include <linux/clocksource.h>
 #include <linux/kallsyms.h>
 #include <linux/seq_file.h>
-#include <linux/suspend.h>
 #include <linux/debugfs.h>
 #include <linux/hardirq.h>
-#include <linux/kthread.h>
 #include <linux/uaccess.h>
 #include <linux/ftrace.h>
 #include <linux/sysctl.h>
@@ -20,6 +18,9 @@
 #include <linux/fsnotify.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>
+#include <linux/socket.h>
+#include <net/sock.h>
+#include <net/af_unix.h>
 
 #include "../../av_permissions.h"
 #include "../../flask.h"
@@ -91,7 +92,7 @@ static int subbuf_wall_interfaces_start_callback(struct rchan_buf *buf, void *su
 
 /* Relay channel operations */
 
-spinlock_t wall_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(wall_lock);
 unsigned long wall_lock_flags;
 
 atomic_t dropped = ATOMIC_INIT(0);
@@ -378,6 +379,7 @@ int pft_debug_needed(char *string)
 	return 0;
 }
 
+#if 0
 /* TODO: Integrate the code for interpreter symbol table and this */
 /*
  * Examine the ELF binary and return a pointer to the requested section.
@@ -388,6 +390,7 @@ int pft_debug_needed(char *string)
  * @section_size: Will be filled in with the size of the section
  * Return: A pointer to the section. Caller has to free pointer.
  */
+
 void *get_section(struct file *exe_file, char *section_name, unsigned long *section_size)
 {
 	int ret = 0;
@@ -773,6 +776,7 @@ out:
 		return ret;
 	return offset;
 }
+#endif
 
 /* Given an packet, fill up the VM area name (or inode) for the ith entry.
    Also update if it is the first IP within the program */
@@ -867,23 +871,7 @@ end:
 	return ret;
 }
 
-static int copy_stack_frame(const void __user *fp,
-			struct stack_frame *frame)
-{
-	int ret;
-
-	if (!access_ok(VERIFY_READ, fp, sizeof(*frame)))
-		return 0;
-
-	ret = 1;
-	pagefault_disable();
-	if (__copy_from_user_inatomic(frame, fp, sizeof(*frame)))
-		ret = 0;
-	pagefault_enable();
-
-	return ret;
-}
-
+#if 0
 /* Fill up the stack trace along with the VM area names/inodes:
    NOTE: These need be done together because for accurate
    unrolling, we need to know if the VM area has optimized functions */
@@ -1062,61 +1050,47 @@ end:
 	return ret;
 }
 EXPORT_SYMBOL(pft_stacktrace_and_vm_area_context);
+#endif
 
 int pft_auditdata_context(struct pf_packet_context *p)
 {
 	int rc = 0;
+	struct dentry *dentry = NULL;
+	struct inode *inode = NULL;
+	struct common_audit_data *a = p->auditdata;
 
 	strcpy(p->info.filename, "N/A");
 //	p->info.filename = kstrdup("N/A", GFP_ATOMIC);
-	if (p->auditdata) {
-		switch (p->auditdata->type) {
-		case LSM_AUDIT_DATA_FS:
-			if (p->auditdata->u.fs.path.dentry) {
-				struct dentry *dentry = NULL;
-				dentry = p->auditdata->u.fs.path.dentry;
-				if (p->auditdata->u.fs.path.mnt) {
-					char *tmp = kmalloc(PAGE_SIZE, GFP_ATOMIC);
-					if (!tmp) {
-						rc = -ENOMEM;
-						goto end;
-					}
-//					kfree(p->info.filename);
-					strcpy(p->info.filename, d_path(&p->auditdata->u.fs.path, tmp, PAGE_SIZE));
-//					p->info.filename = kstrdup(d_path(&p->auditdata->u.fs.path, tmp, PAGE_SIZE), GFP_ATOMIC);
-					if (IS_ERR(p)) {
-						rc = -ENOMEM;
-						kfree(tmp);
-						goto end;
-					}
-					kfree(tmp);
-				} else {
-//j					kfree(p->info.filename);
-					strcpy(p->info.filename, dentry->d_name.name);
-//					p->info.filename = kstrdup(dentry->d_name.name, GFP_ATOMIC);
-				}
-				if (dentry->d_inode) {
-					/* In the case of mkdir, the inode isn't
-					created yet, though the name is there */
-					p->info.filename_inoden = dentry->d_inode->i_ino;
-				}
-			} else if (p->auditdata->u.fs.inode) {
-				struct dentry *dentry;
-				struct inode *inode;
-				inode = p->auditdata->u.fs.inode;
+	if (a) {
+		switch (a->type) {
+			case LSM_AUDIT_DATA_DENTRY: {
+				dentry = a->u.dentry;
+				inode = a->u.dentry->d_inode;
+				break;
+			}
+			case LSM_AUDIT_DATA_INODE: {
+				inode = a->u.inode;
 				dentry = d_find_alias(inode);
-				if (dentry) {
-//					kfree(p->info.filename);
-//					p->info.filename = kstrdup(dentry->d_name.name, GFP_ATOMIC);
-					strcpy(p->info.filename, dentry->d_name.name);
-					p->info.filename_inoden = inode->i_ino;
+				break;
+			}
+			case LSM_AUDIT_DATA_NET: {
+				if (a->u.net.sk) {
+					struct sock *sk = a->u.net.sk;
+					struct unix_sock *u;
+
+					if (sk->sk_family == AF_UNIX) {
+						u = unix_sk(sk);
+						dentry = u->dentry;
+						inode = dentry->d_inode;
+						break;
+					}
 				}
 			}
-			break;
-		default:
+			default:
 			;
 		}
 	}
+	strcpy(p->info.filename, dentry->d_name.name);
 
 	/* If we are creating an inode, we don't have the
 	   context of the inode unless called from proper hook. */
@@ -1126,14 +1100,13 @@ int pft_auditdata_context(struct pf_packet_context *p)
 				return 0;
 	}
 	p->context |= PF_CONTEXT_FILENAME;
-end:
 	return rc;
 }
 EXPORT_SYMBOL(pft_auditdata_context);
 
 char *syscall_value_as_string(char *str, int arg_num, int offset, int type)
 {
-	int value;
+	int value = 0;
 	char *value_ptr = NULL;
 	struct pt_regs *ptregs = (struct pt_regs *)
 			(current->thread.sp0 - sizeof (struct pt_regs));
