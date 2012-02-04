@@ -26,6 +26,7 @@
  * if_sdio_card_to_host() to pad the data.
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>

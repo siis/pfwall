@@ -1333,7 +1333,7 @@ enum {
 	Opt_nomblk_io_submit, Opt_block_validity, Opt_noblock_validity,
 	Opt_inode_readahead_blks, Opt_journal_ioprio,
 	Opt_dioread_nolock, Opt_dioread_lock,
-	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
+	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable, Opt_nocheck,
 };
 
 static const match_table_t tokens = {
@@ -1409,6 +1409,8 @@ static const match_table_t tokens = {
 	{Opt_init_itable, "init_itable=%u"},
 	{Opt_init_itable, "init_itable"},
 	{Opt_noinit_itable, "noinit_itable"},
+	{Opt_nocheck, "check=none"},
+	{Opt_nocheck, "nocheck"},
 	{Opt_err, NULL},
 };
 
@@ -1904,6 +1906,9 @@ set_qf_format:
 			break;
 		case Opt_noinit_itable:
 			clear_opt(sb, INIT_INODE_TABLE);
+			break;
+		case Opt_nocheck:
+			/* ext2/ext3 used to "support" this option.  Silently eat it */
 			break;
 		default:
 			ext4_msg(sb, KERN_ERR,

@@ -43,6 +43,9 @@ static int warn_unresolved = 0;
 static int sec_mismatch_count = 0;
 static int sec_mismatch_verbose = 1;
 
+/* Is this a module being built as part of an integrated package? */
+static int integrated_build = 0;
+
 enum export {
 	export_plain,      export_unused,     export_gpl,
 	export_unused_gpl, export_gpl_future, export_unknown
@@ -1851,7 +1854,7 @@ static void add_header(struct buffer *b, struct module *mod)
 
 static void add_intree_flag(struct buffer *b, int is_intree)
 {
-	if (is_intree)
+	if (is_intree || integrated_build)
 		buf_printf(b, "\nMODULE_INFO(intree, \"Y\");\n");
 }
 
@@ -2101,7 +2104,7 @@ int main(int argc, char **argv)
 	struct ext_sym_list *extsym_iter;
 	struct ext_sym_list *extsym_start = NULL;
 
-	while ((opt = getopt(argc, argv, "i:I:e:cmsSo:awM:K:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:e:cmsSo:awM:K:B")) != -1) {
 		switch (opt) {
 		case 'i':
 			kernel_read = optarg;
@@ -2138,6 +2141,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			warn_unresolved = 1;
+			break;
+		case 'B':
+			integrated_build = 1;
 			break;
 		default:
 			exit(1);

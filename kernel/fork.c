@@ -67,6 +67,7 @@
 #include <linux/oom.h>
 #include <linux/khugepaged.h>
 #include <linux/wall.h>
+#include <linux/utrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -171,6 +172,8 @@ void free_task(struct task_struct *tsk)
 	free_thread_info(tsk->stack);
 	rt_mutex_debug_task_free(tsk);
 	ftrace_graph_exit_task(tsk);
+	if (task_utrace_struct(tsk))
+		utrace_free_task(tsk);
 	free_task_struct(tsk);
 }
 EXPORT_SYMBOL(free_task);
@@ -1093,6 +1096,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (!p)
 		goto fork_out;
 
+	utrace_init_task(p);
+
 	ftrace_graph_init_task(p);
 
 	rt_mutex_init_task(p);
@@ -1540,6 +1545,8 @@ long do_fork(unsigned long clone_flags,
 
 		audit_finish_fork(p);
 
+		UTRACE_HOOK(current, CLONE, report_clone(clone_flags, p));
+
 		/*
 		 * We set PF_STARTING at creation in case tracing wants to
 		 * use this to distinguish a fully live task from one that
@@ -1551,6 +1558,8 @@ long do_fork(unsigned long clone_flags,
 		wake_up_new_task(p);
 
 		/* forking complete and child started to run, tell ptracer */
+		if (clone_flags & CLONE_VFORK)
+			UTRACE_HOOK(current, CLONE, finish_vfork(current));
 		if (unlikely(trace))
 			ptrace_event(trace, nr);
 

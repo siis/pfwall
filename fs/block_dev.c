@@ -401,6 +401,10 @@ int blkdev_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 	if (error == -EOPNOTSUPP)
 		error = 0;
 
+	/* invalidate parent block_device */
+	if (!error && bdev != bdev->bd_contains)
+		invalidate_bdev(bdev->bd_contains);
+
 	return error;
 }
 EXPORT_SYMBOL(blkdev_fsync);

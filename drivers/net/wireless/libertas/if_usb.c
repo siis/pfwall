@@ -2,6 +2,7 @@
  * This file contains functions used in USB interface module.
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/delay.h>

@@ -90,6 +90,71 @@ done:
 }
 
 /* ------------------------------------------------------------------------
+ * UVC ioctls
+ */
+static int uvc_ioctl_ctrl_map(struct uvc_xu_control_mapping *xmap, int old)
+{
+	struct uvc_control_mapping *map;
+	unsigned int size;
+	int ret;
+
+	map = kzalloc(sizeof *map, GFP_KERNEL);
+	if (map == NULL)
+		return -ENOMEM;
+
+	map->id = xmap->id;
+	memcpy(map->name, xmap->name, sizeof map->name);
+	memcpy(map->entity, xmap->entity, sizeof map->entity);
+	map->selector = xmap->selector;
+	map->size = xmap->size;
+	map->offset = xmap->offset;
+	map->v4l2_type = xmap->v4l2_type;
+	map->data_type = xmap->data_type;
+
+	switch (xmap->v4l2_type) {
+	case V4L2_CTRL_TYPE_INTEGER:
+	case V4L2_CTRL_TYPE_BOOLEAN:
+	case V4L2_CTRL_TYPE_BUTTON:
+		break;
+
+	case V4L2_CTRL_TYPE_MENU:
+		if (old) {
+			ret = -EINVAL;
+			goto done;
+		}
+
+		size = xmap->menu_count * sizeof(*map->menu_info);
+		map->menu_info = kmalloc(size, GFP_KERNEL);
+		if (map->menu_info == NULL) {
+			ret = -ENOMEM;
+			goto done;
+		}
+
+		if (copy_from_user(map->menu_info, xmap->menu_info, size)) {
+			ret = -EFAULT;
+			goto done;
+		}
+
+		map->menu_count = xmap->menu_count;
+		break;
+
+	default:
+		ret = -EINVAL;
+		goto done;
+	}
+
+	ret = uvc_ctrl_add_mapping(map);
+
+done:
+	if (ret < 0) {
+		kfree(map->menu_info);
+		kfree(map);
+	}
+
+	return ret;
+}
+
+/* ------------------------------------------------------------------------
  * V4L2 interface
  */
 

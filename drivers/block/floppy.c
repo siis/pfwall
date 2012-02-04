@@ -1038,7 +1038,7 @@ static void floppy_disable_hlt(void)
 {
 	unsigned long flags;
 
-	WARN_ONCE(1, "floppy_disable_hlt() scheduled for removal in 2012");
+	printk(KERN_INFO "floppy_disable_hlt() scheduled for removal in 2012");
 	spin_lock_irqsave(&floppy_hlt_lock, flags);
 	if (!hlt_disabled) {
 		hlt_disabled = 1;
@@ -4607,8 +4607,7 @@ static const struct pnp_device_id floppy_pnpids[] = {
 	{"PNP0700", 0},
 	{}
 };
-
-MODULE_DEVICE_TABLE(pnp, floppy_pnpids);
+/* MODULE_DEVICE_TABLE(pnp, floppy_pnpids); */
 
 #else
 

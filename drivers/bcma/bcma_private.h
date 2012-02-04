@@ -1,6 +1,7 @@
 #ifndef LINUX_BCMA_PRIVATE_H_
 #define LINUX_BCMA_PRIVATE_H_
 
+#undef pr_fmt
 #ifndef pr_fmt
 #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
 #endif
