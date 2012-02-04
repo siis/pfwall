@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 2
 SUBLEVEL = 0
-EXTRAVERSION =-pfwall
+EXTRAVERSION =-pfwall-fedora-patches
 NAME = Saber-toothed Squirrel
 
 # *DOCUMENTATION*
