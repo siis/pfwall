@@ -432,7 +432,7 @@ static int pf_translate_inode(struct pft_entry *e)
 	} else {
 		e->def.script_inoden = 0;
 	}
-	path_put(&bin_p);
+//	path_put(&bin_p);
 
 	return ret;
 	#endif

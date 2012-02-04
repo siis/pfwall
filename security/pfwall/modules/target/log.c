@@ -1090,7 +1090,8 @@ int pft_auditdata_context(struct pf_packet_context *p)
 			;
 		}
 	}
-	strcpy(p->info.filename, dentry->d_name.name);
+	if (dentry)
+		strcpy(p->info.filename, dentry->d_name.name);
 
 	/* If we are creating an inode, we don't have the
 	   context of the inode unless called from proper hook. */

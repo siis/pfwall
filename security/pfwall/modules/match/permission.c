@@ -275,7 +275,6 @@ next_iter:
 		path_put(&p_nd);
 		dput(fdentry);
 	} else if (f_exist == 1) {
-		path_put(&p_nd);
 		path_put(&f_nd);
 	}
 out_put_ppath:
