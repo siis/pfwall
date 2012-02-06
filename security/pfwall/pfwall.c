@@ -677,8 +677,8 @@ int pft_interface_context(struct pf_packet_context *p)
 		place with the VM area, so debug info can be
 		retrieved.  However, this hurts performance */
 //	ret = pft_stacktrace_and_vm_area_context(p);
-	if (ret < 0)
-		goto end;
+//	if (ret < 0)
+//		goto end;
 
 	/* Now, get interpreter context */
 	/* TODO: We are now forced to get the binary path name,
@@ -3208,7 +3208,7 @@ decided_here:
 			p->context &= ~PF_CONTEXT_SYSCALL_FILENAME;
 			p->interpreter_info.nr_entries = 0;
 			p->trace.nr_entries = 0;
-			p->context = 0;
+			p->context = 0; /* Binary path context available till exec hook */
 		} else if (hook == PF_HOOK_SYSCALL_BEGIN) {
 			p->interpreter_info.nr_entries = 0;
 			p->trace.nr_entries = 0;

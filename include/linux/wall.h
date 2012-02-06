@@ -40,6 +40,7 @@
 #define PF_CONTEXT_BINARY_PATH_INODE 0x400 /* The process binary file inode */
 #define PF_CONTEXT_SIGINFO 0x800 /* Signal information */
 #define PF_CONTEXT_SYSCALL_FILENAME 0x1000 /* Filename from syscall args */
+#define PF_CONTEXT_DAC_BINDERS 0x2000 /* Possible attacker UID */
 
 /* Hooks */
 #define PF_NR_HOOKS 7 /* input, output, data read, inode create */
@@ -255,6 +256,10 @@ struct pf_packet_context {
 	/* Filename deduced from syscall as opposed to
 	   that from auditdata */
 	char __user *syscall_filename;
+
+	/* UID of user that can attack filename resource
+		syscall_filename */
+	uid_t sys_fname_attacker_uid; 
 };
 
 extern struct kmem_cache *pf_packet_context_cachep;
@@ -553,9 +558,6 @@ dict_node_t *pft_dict_get_entry(char *);
 #define TYPE_HARDLINK 0x1
 #define TYPE_SYMLINK 0x2
 
-/* Return value space augment */
-#define NO_MATCH -0x10000
-
 
 /* Hashing helper utility function */
 extern unsigned long pfwall_hash(unsigned char *str);
@@ -662,7 +664,7 @@ struct dwarf_fde
 #define ATTACKER_PREBIND 0x80
 /* If exists, then delete and create permissions, else just create permission */
 #define ATTACKER_BIND 0x100
-uid_t pft_get_uid_with_permission(int flags, const char __user *filename);
+int pft_get_uid_with_permission(int flags, const char __user *filename); 
 
 /* syscall_invoked module */
 extern atomic_t pfw_syscalls_invoked[NR_syscalls + 1];
@@ -755,6 +757,9 @@ extern unsigned long _nfwall_counter;
 #define MAX_USERS 256
 /* Maximum number of groups a user can be a member of */
 #define GRP_MEMB_MAX 32
+
+/* Return value space augment */
+#define PFW_UID_NO_MATCH MAX_USERS 
 
 /* Extended attributes */
 #define ATTACKER_XATTR_PREFIX "security."

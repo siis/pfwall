@@ -246,6 +246,9 @@ int pft_vm_area_inode_context(struct pf_packet_context *p)
 	int i = 0;
 	unsigned long address;
 
+	p->trace_first_program_ip = -1;
+	p->program_ip_exists = 0; /* No error */
+
 	if (!current->mm) {
 		ret = -EINVAL;
 		goto end;
@@ -287,12 +290,17 @@ int pft_vm_area_inode_context(struct pf_packet_context *p)
 		}
 		i++;
 	}
+
+	/* If everything originates from the library, arbitrarily choose
+	 * the first entry-point */
+	if (p->program_ip_exists == 0) {
+		p->trace_first_program_ip = 0;
+	}
 //	p->context |= PF_CONTEXT_VM_AREA_STRINGS;
 end:
 	return ret;
 }
 EXPORT_SYMBOL(pft_vm_area_inode_context);
-
 
 int pft_vm_area_name_context(struct pf_packet_context *p)
 {
@@ -808,6 +816,7 @@ int pft_set_vm_area(struct pf_packet_context *p, int i)
 			if (p->trace_first_program_ip > 0) {
 				ret = 1; /* Just to tell caller that
 						* we have ended */
+				goto end;
 			}
 
 			/* TODO: Investigate why below happens */
@@ -871,10 +880,10 @@ end:
 	return ret;
 }
 
-#if 0
 /* Fill up the stack trace along with the VM area names/inodes:
    NOTE: These need be done together because for accurate
    unrolling, we need to know if the VM area has optimized functions */
+#if 0
 int pft_stacktrace_and_vm_area_context(struct pf_packet_context *p)
 {
 
@@ -912,6 +921,7 @@ int pft_stacktrace_and_vm_area_context(struct pf_packet_context *p)
 		unsigned long sp_offset = 8;
 		unsigned int reg = REG_EBP;
 
+#ifdef ADVANCED_STACKTRACE
 		/* Have we already unrolled this frame before? */
 		if ((v = pft_debug_dict_get_value(p->vm_area_strings[prev],
 			trace->entries[prev] - p->vma_start[prev])) != NULL) {
@@ -949,6 +959,7 @@ int pft_stacktrace_and_vm_area_context(struct pf_packet_context *p)
 				sp_offset, reg);
 		}
 // next:
+#endif
 		/* Unroll this frame */
 		if (sp_offset == 8 && reg == REG_EBP) {
 			/* Normal unroll - update fp, sp */
@@ -969,7 +980,9 @@ int pft_stacktrace_and_vm_area_context(struct pf_packet_context *p)
 				break;
 			fp = frame.next_fp;
 			sp = (frame.next_fp) + 8;
-		} else if (reg == REG_ESP) {
+		}
+		#if 0
+		else if (reg == REG_ESP) {
 			/* Debug unroll */
 			sp += sp_offset;
 			if (copy_from_user(&(trace->entries[trace->nr_entries]),
@@ -984,28 +997,7 @@ int pft_stacktrace_and_vm_area_context(struct pf_packet_context *p)
 			printk(KERN_INFO PFWALL_PFX
 				"sp_offset not 8 and reg == %d", reg);
 		}
-
-#if 0
-else {
-			/* Normal unroll - update fp, sp */
-			struct stack_frame frame;
-
-			frame.next_fp = NULL;
-			frame.ret_addr = 0;
-			if (!copy_stack_frame(fp, &frame))
-				break;
-			if ((unsigned long)fp < regs->sp)
-				break;
-			if (frame.ret_addr) {
-				trace->entries[trace->nr_entries++] =
-					frame.ret_addr;
-			}
-			if (fp == frame.next_fp)
-				break;
-			fp = frame.next_fp;
-			sp = (frame.next_fp) + 8;
-		}
-#endif
+		#endif
 		/* Get the VM area name, start, and inode of backing file
 		   as needed */
 		ret = pft_set_vm_area(p, trace->nr_entries - 1);
@@ -1025,7 +1017,6 @@ else {
 			#endif
 			goto end;
 		}
-
 	}
 	if (trace->nr_entries < trace->max_entries)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
@@ -1306,9 +1297,10 @@ interpreter:
 			if (!phier_s)
 				goto end;
 			get_proc_hier(phier_s, MAX_PROC_HIER);
-			core_log_str = kasprintf(GFP_ATOMIC, "TR%d(%d)-%d,%lu),%d,%s:%s,1,%lx,%s,%s\n",
+			core_log_str = kasprintf(GFP_ATOMIC, "TR%d(%d)-[%d,%d],%lu),%d,%s:%s,1,%lx,%s,%s\n",
 			sn, (sn == __NR_socketcall) ? ptregs->bx : 0,
 			current->cred->fsuid,
+			(p->context & PF_CONTEXT_DAC_BINDERS) ? p->sys_fname_attacker_uid : -1,
 			_current_trace,
 			p->info.pid,
 			p->info.binary_path,

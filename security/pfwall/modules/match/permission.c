@@ -173,12 +173,12 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
  * @flags: %ATTACKER_BIND, %ATTACKER_PREBIND
  * @filename: name of file to check permissions on
  *
- * Returns uid if an attacker exists, 0 if not, -errno if error.
+ * Returns index in uid_array of attacker if one exists, PFW_UID_NO_MATCH if not, -errno if error.
  */
 
-uid_t pft_get_uid_with_permission(int flags, const char __user *fname)
+int pft_get_uid_with_permission(int flags, const char __user *fname)
 {
-	int ret = 0, i = 0, f_exist = -1, match = 0;
+	int ret = 0, i = 0, f_exist = -1, match = PFW_UID_NO_MATCH;
 	char *tmp;
 	/* TODO: Collapse p_nd and f_nd into one */
 	struct path p_nd, f_nd;
@@ -261,11 +261,11 @@ uid_t pft_get_uid_with_permission(int flags, const char __user *fname)
 		}
 
 		/* If we come here, success */
-		match = 1;
+		match = i;
 next_iter:
 		/* Revert original creds */
 		revert_creds(old_cred);
-		if (match == 1)
+		if (match != PFW_UID_NO_MATCH)
 			break;
 	}
 
@@ -281,12 +281,7 @@ out_put_ppath:
 	path_put(&par_nd.path);
 
 out:
-	if (ret < 0)
-		return ret;
-	else if (match == 1)
-		return i; /* Index in uid array */
-	else /* match == 0 */
-		return NO_MATCH;
+	return (ret < 0) ? ret : match;
 }
 EXPORT_SYMBOL(pft_get_uid_with_permission);
 
@@ -294,14 +289,19 @@ EXPORT_SYMBOL(pft_get_uid_with_permission);
 	others, just the resource. */
 bool pft_permission_match(struct pf_packet_context *p, void *match_specific_data)
 {
+	int ret = 0;
 	struct pft_permission_match *pm = (struct pft_permission_match *) match_specific_data;
-	uid_t u = pft_get_uid_with_permission(pm->flags, p->syscall_filename);
-	if (u == NO_MATCH)
+	ret = pft_get_uid_with_permission(pm->flags, p->syscall_filename);
+	/* TODO: Clean up this context. Should it be context or match?
+		Called in other contexts, e.g., from hardlink_create, does not set context bit */
+	p->context |= PF_CONTEXT_DAC_BINDERS;
+	if (ret < 0 || ret == PFW_UID_NO_MATCH) { /* Error */
+		p->sys_fname_attacker_uid = -1;
 		return 0;
-	else if (u < 0) /* Error */
-		return 0;
-	else /* some uid matched */
+	} else { /* some uid matched */
+		p->sys_fname_attacker_uid = uid_array[ret][0];
 		return 1;
+	}
 }
 
 static int __init pft_permission_match_init(void)

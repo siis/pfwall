@@ -360,7 +360,7 @@ int hardlink_create(char __user *filename, int type, int sn)
 
 	exists = already_exists(filename, DONT_FOLLOW, &buf);
 	att_uid_ind = pft_get_uid_with_permission(ATTACKER_BIND, filename);
-	if (att_uid_ind >= 0) {
+	if (att_uid_ind >= 0 && att_uid_ind != PFW_UID_NO_MATCH) {
 		orig_fsuid = current->cred->fsuid;
 
 		/* Change creds to attacker's */
