@@ -1064,6 +1064,11 @@ int pft_auditdata_context(struct pf_packet_context *p)
 				dentry = d_find_alias(inode);
 				break;
 			}
+			case LSM_AUDIT_DATA_PATH: {
+				inode = a->u.path.dentry->d_inode;
+				dentry = d_find_alias(inode);
+				break;
+			}
 			case LSM_AUDIT_DATA_NET: {
 				if (a->u.net.sk) {
 					struct sock *sk = a->u.net.sk;
@@ -1071,8 +1076,10 @@ int pft_auditdata_context(struct pf_packet_context *p)
 
 					if (sk->sk_family == AF_UNIX) {
 						u = unix_sk(sk);
-						dentry = u->dentry;
-						inode = dentry->d_inode;
+						if (u->dentry) {
+							dentry = u->dentry;
+							inode = dentry->d_inode;
+						}
 						break;
 					}
 				}
@@ -1081,8 +1088,12 @@ int pft_auditdata_context(struct pf_packet_context *p)
 			;
 		}
 	}
-	if (dentry)
+	if (dentry) {
 		strcpy(p->info.filename, dentry->d_name.name);
+		if (a->type == LSM_AUDIT_DATA_PATH ||
+			a->type == LSM_AUDIT_DATA_INODE)
+			dput(dentry);
+	}
 
 	/* If we are creating an inode, we don't have the
 	   context of the inode unless called from proper hook. */

@@ -24,8 +24,8 @@
 #include <net/sock.h>
 #include <net/af_unix.h>
 
-#if 0
 /* TODO: follow as flag */
+#if 0
 int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_data)
 {
 	int tret = 1; /* Not marked */
@@ -85,7 +85,6 @@ out:
 }
 #endif
 
-
 /**
  * Use the current resource being accessed, from the dentry object, to determine the
  * xattr; NOT the filename in the initial system call -- that won't be able to
@@ -112,6 +111,11 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 				dentry = d_find_alias(inode);
 				break;
 			}
+			case LSM_AUDIT_DATA_PATH: {
+				inode = a->u.path.dentry->d_inode;
+				dentry = d_find_alias(inode);
+				break;
+			}
 			case LSM_AUDIT_DATA_NET: {
 				if (a->u.net.sk) {
 					struct sock *sk = a->u.net.sk;
@@ -119,8 +123,10 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 
 					if (sk->sk_family == AF_UNIX) {
 						u = unix_sk(sk);
-						dentry = u->dentry;
-						inode = dentry->d_inode;
+						if (u->dentry) {
+							dentry = u->dentry;
+							inode = dentry->d_inode;
+						}
 						break;
 					}
 				}
@@ -129,6 +135,7 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 			;
 		}
 	}
+
 	if (dentry && inode && inode->i_op->getxattr)
 		error = inode->i_op->getxattr(dentry, ATTACKER_XATTR_STRING, value, 4);
 
@@ -136,8 +143,10 @@ int pft_match_attacker_marked(struct pf_packet_context *p, void *match_specific_
 		/* What to do? */
 	}
 
-	if (a->type == LSM_AUDIT_DATA_INODE)
+	if (dentry && (a->type == LSM_AUDIT_DATA_PATH ||
+		a->type == LSM_AUDIT_DATA_INODE))
 		dput(dentry);
+
 	return (error > 0 || error == -ERANGE) ? 1 : 0;
 
 }
