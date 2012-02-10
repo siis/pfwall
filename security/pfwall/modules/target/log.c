@@ -119,10 +119,10 @@ int pft_type_context(struct pf_packet_context *p)
 	/* Let us hold a lock so we won't be preempted -- till we finish gathering p data  -- to be done later */
 	rc = security_sid_to_context (p->info.ssid, &scontext, &scontext_len);
         if (rc)
-              return rc;
+              goto end;
 	rc = security_sid_to_context (p->info.tsid, &tcontext, &tcontext_len);
         if (rc)
-              return rc;
+              goto end;
 
 	path = kzalloc(PAGE_SIZE, GFP_ATOMIC);
 	if (path == NULL) {
@@ -135,12 +135,12 @@ int pft_type_context(struct pf_packet_context *p)
 	stype = context_to_type(scontext);
 	if (stype == NULL) {
 		rc = -EINVAL; /* Initial SID */
-		return rc;
+		goto end;
 	}
 	ttype = context_to_type(tcontext);
 	if (ttype == NULL) {
 		rc = -EINVAL; /* Initial SID */
-		return rc;
+		goto end;
 	}
 
 	strcpy(p->info.scontext, stype);
