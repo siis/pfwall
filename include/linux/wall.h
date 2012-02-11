@@ -191,10 +191,10 @@ struct static_stack_trace {
 	unsigned long entries[MAX_NUM_FRAMES]; /* Address in memory */
 	int skip;
 };
-	
+
 struct interpreter_info {
 	unsigned int nr_entries, max_entries;
-	char script_filename[MAX_NUM_FRAMES][PAGE_SIZE];
+	char script_filename[MAX_NUM_FRAMES][PATH_MAX];
 	unsigned long script_inoden[MAX_NUM_FRAMES];
 	unsigned long line_number[MAX_NUM_FRAMES];
 };
@@ -221,7 +221,7 @@ struct pf_packet_context {
 	struct static_stack_trace trace;
 
 	/* Backtrace info */
-	char vm_area_strings[MAX_NUM_FRAMES][PAGE_SIZE];
+	char vm_area_strings[MAX_NUM_FRAMES][PATH_MAX];
 	unsigned long vm_area_inoden[MAX_NUM_FRAMES];
 	unsigned long vma_start[MAX_NUM_FRAMES];
 

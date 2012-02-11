@@ -1090,6 +1090,8 @@ int pft_auditdata_context(struct pf_packet_context *p)
 	}
 	if (dentry) {
 		strcpy(p->info.filename, dentry->d_name.name);
+		if (dentry->d_inode) /* inode may not have been created yet */
+			p->info.filename_inoden = dentry->d_inode->i_ino;
 		if (a->type == LSM_AUDIT_DATA_PATH ||
 			a->type == LSM_AUDIT_DATA_INODE)
 			dput(dentry);
