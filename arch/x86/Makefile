@@ -109,8 +109,14 @@ LDFLAGS := -m elf_$(UTS_MACHINE)
 KBUILD_CFLAGS += -pipe
 # Workaround for a gcc prelease that unfortunately was shipped in a suse release
 KBUILD_CFLAGS += -Wno-sign-compare
-#
+
+ifdef CONFIG_UNWIND_EH_FRAME
+LDFLAGS_vmlinux += --eh-frame-hdr
+else
+# do not generate ef_frame section by default
 KBUILD_CFLAGS += -fno-asynchronous-unwind-tables
+endif
+
 # prevent gcc from generating any FP code by mistake
 KBUILD_CFLAGS += $(call cc-option,-mno-sse -mno-mmx -mno-sse2 -mno-3dnow,)
 

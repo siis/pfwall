@@ -66,7 +66,7 @@
 #define PFWALL_MATCH_REPR
 
 /* Advanced stacktrace - Remember to change paths of libraries */
-// #define PFWALL_ADVANCED_STACKTRACE
+#define PFWALL_ADVANCED_STACKTRACE
 
 #define PFW_UBUNTU_10_04_LIBC_PATH "/lib/tls/i686/cmov/libc-2.11.1.so"
 #define PFW_UBUNTU_10_04_LD_SO_PATH "/lib/ld-2.11.1.so"
@@ -120,6 +120,28 @@
 	((struct pft_entry *) ((table)->table_base + \
 		(table)->pft_chains[(i)].chain_offset))
 
+#define PFWALL_PFX "pfwall: "
+#define PFWALL_MAX_PENDING 16
+
+#define PFWALL_DBG_ON 0
+#define PFWALL_ERR_LVL 0
+
+#define PFWALL_DBG(s, ...) \
+	do { \
+		if (PFWALL_DBG_ON == 1) { \
+			printk(KERN_INFO PFWALL_PFX "debug: [%s:%05d]: " s, \
+					__FUNCTION__, __LINE__, ## __VA_ARGS__); \
+		} \
+	} while (0)
+
+#define PFWALL_ERR(l, s, ...) \
+	do { \
+			if (l <= PFWALL_ERR_LVL) { \
+				printk(KERN_INFO PFWALL_PFX "error: [%s:%05d]: " s, \
+						__FUNCTION__, __LINE__, ## __VA_ARGS__); \
+			} \
+	} while (0)
+
 /* Is the process firewall enabled or not? */
 extern int pfwall_enabled;
 
@@ -142,7 +164,6 @@ struct wall_violations_msg
 	} payload;
 };
 
-#define PFWALL_PFX "pfwall: "
 struct wall_violations_msg_ctx
 {
 	int state; /* NL_VIOLATIONS_STATE_[PENDING]/[FINISHED] */
@@ -186,6 +207,75 @@ struct proc_info {
 	unsigned long binary_inoden;
 };
 
+#define INT_FNAME_MAX 64
+
+/* Same as stack_trace except static size */
+struct static_stack_trace {
+	unsigned int nr_entries, max_entries;
+	unsigned long entries[MAX_NUM_FRAMES]; /* ip */
+	unsigned long stack_bases[MAX_NUM_FRAMES]; /* sp - for local vars */
+
+	int bin_ip_exists; /* Does entrypoint exist in program? */
+	int ept_ind; /* Entrypoint index */
+	/* inode and start address for each VMA in program trace */
+	ino_t vma_inoden[MAX_NUM_FRAMES]; 
+	unsigned long vma_start[MAX_NUM_FRAMES]; 
+	char vm_area_strings[MAX_NUM_FRAMES][PATH_MAX];
+}; 
+
+/* interpreter stack trace */
+struct interpreter_stack_trace {
+	unsigned int nr_entries, max_entries;
+	/* line numbers */
+	unsigned long entries[MAX_NUM_FRAMES];
+	/* filename for each script file in the stack trace */
+	char int_filename[MAX_NUM_FRAMES][INT_FNAME_MAX]; 
+}; 
+
+struct user_stack_info {
+	struct static_stack_trace trace;
+	struct interpreter_stack_trace int_trace; 
+}; 
+
+#define EPT_VMA_OFFSET(addr, us) ((addr) + (us->trace.vma_start[us->trace.ept_ind]))
+#define EPT_INO(t) (t->user_stack.trace.vma_inoden[t->user_stack.trace.ept_ind])
+
+static inline ino_t ept_inode_get(struct user_stack_info *us)                                                                                                                                                                                
+{
+    return us->trace.vma_inoden[us->trace.ept_ind];
+}
+#if 0
+static unsigned long ept_offset_get(struct user_stack_info *us)
+{
+    return us->trace.entries[us->trace.ept_ind] - us->trace.vma_start[us->trace.ept_ind];
+}
+#endif 
+static inline int valid_user_stack(struct user_stack_info *us)
+{
+    return (us->trace.entries[0] != ULONG_MAX);
+}
+
+static inline char *int_ept_filename_get(struct user_stack_info *us)
+{
+	return (us->int_trace.nr_entries > 0) ? (us->int_trace.int_filename[0]) : NULL; 
+}
+
+static inline int int_ept_lineno_get(struct user_stack_info *us)
+{
+	return (us->int_trace.nr_entries > 0) ? (us->int_trace.entries[0]) : 0; 
+}
+
+static inline int int_ept_exists(struct user_stack_info *us)
+{
+	return (us->int_trace.nr_entries > 0); 
+}
+
+extern int is_interpreter(struct task_struct *t); 
+extern int user_interpreter_unwind(struct pf_packet_context *p); 
+extern struct int_bt_info *on_script_behalf(struct user_stack_info *us); 
+extern void copy_interpreter_info(struct task_struct *c, struct task_struct *p); 
+
+#if 0
 struct static_stack_trace {
 	unsigned int nr_entries, max_entries;
 	unsigned long entries[MAX_NUM_FRAMES]; /* Address in memory */
@@ -198,12 +288,12 @@ struct interpreter_info {
 	unsigned long script_inoden[MAX_NUM_FRAMES];
 	unsigned long line_number[MAX_NUM_FRAMES];
 };
+#endif 
 
 struct stack_frame_user {
 	const void __user	*next_fp;
 	unsigned long		ret_addr;
 };
-
 
 struct pft_entry;
 /*
@@ -218,12 +308,8 @@ struct pft_entry;
 */
 
 struct pf_packet_context {
-	struct static_stack_trace trace;
-
-	/* Backtrace info */
-	char vm_area_strings[MAX_NUM_FRAMES][PATH_MAX];
-	unsigned long vm_area_inoden[MAX_NUM_FRAMES];
-	unsigned long vma_start[MAX_NUM_FRAMES];
+	/* userstack and interpreter entrypoints */
+	struct user_stack_info user_stack; 
 
 	struct proc_info info;
 	unsigned long trace_first_program_ip; /* index in trace of first IP in program, -1 if invalid */
@@ -232,18 +318,11 @@ struct pf_packet_context {
 	int hook_mask; /* Which hooks decisions need be made on
 	* as context becomes available */
 	int context; /* Context mask for available contexts in this packet */
-	/* The last directory searched - we place a watch on this
-	 * in inotify if we need creation inode context */
-//	unsigned long last_dir_searched;
 
 	/* Module-Specific contexts TODO: Make this generic */
 	struct common_audit_data *auditdata; /* SELinux auditdata */
 	char *data; /* Pointer to data context in the kernel */
 	size_t data_count; /* Actual number of bytes read */
-	/* Syscall arguments */
-	/* Pointer to start of arbitrary process state list in the kernel */
-	/* Interpreter backtrace */
-	struct interpreter_info interpreter_info;
 
 	/* Signal information */
 	int signo;
@@ -253,8 +332,7 @@ struct pf_packet_context {
 	unsigned int stackptr;
 	struct pft_entry *jumpstack[PF_MAX_CHAINS];
 
-	/* Filename deduced from syscall as opposed to
-	   that from auditdata */
+	/* filename from syscall */
 	char __user *syscall_filename;
 
 	/* UID of user that can attack filename resource
@@ -594,61 +672,6 @@ struct inode_security_struct_pfwall {
 
 /* Number of socket calls that are demultiplexed by the single sys_socketcalls */
 #define NR_socketcalls (SYS_RECVMMSG) /* See linux/net.h */
-
-/* DWARF */
-
-/* Do we need advanced unrolling of stack? */
-// #define ADVANCED_STACKTRACE
-
-#define REG_EBP 0x5
-#define REG_ESP 0x4
-#define REG_EIP 0x8
-
-struct dwarf_cfie_header
-{
-	int length;
-};
-
-struct dwarf_fde
-{
-	unsigned long magic;
-	unsigned long initial_location;
-	unsigned long offset;
-	void *instructions;
-};
-
-#define DW_CFA_advance_loc 0x1
-#define DW_CFA_offset 0x2
-#define DW_CFA_restore 0x3
-#define DW_CFA_nop 0x0
-
-#define DW_CFA_set_loc		0x01
-#define DW_CFA_advance_loc1	0x02
-#define DW_CFA_advance_loc2	0x03
-#define DW_CFA_advance_loc4	0x04
-#define DW_CFA_offset_extended	0x05
-#define DW_CFA_restore_extended 0x06
-#define DW_CFA_undefined	0x07
-#define DW_CFA_same_value	0x08
-#define DW_CFA_register		0x09
-#define DW_CFA_remember_state	0x0a
-#define DW_CFA_restore_state	0x0b
-#define DW_CFA_def_cfa		0x0c
-#define DW_CFA_def_cfa_register 0x0d
-#define DW_CFA_def_cfa_offset	0x0e
-
-/* Do we need these? */
-#define DW_CFA_def_cfa_expression 0x0f	   /* DWARF3 */
-#define DW_CFA_expression	0x10	   /* DWARF3 */
-#define DW_CFA_offset_extended_sf 0x11	   /* DWARF3 */
-#define DW_CFA_def_cfa_sf	0x12	   /* DWARF3 */
-#define DW_CFA_def_cfa_offset_sf 0x13	   /* DWARF3 */
-#define DW_CFA_val_offset	 0x14	   /* DWARF3f */
-#define DW_CFA_val_offset_sf	 0x15	   /* DWARF3f */
-#define DW_CFA_val_expression	 0x16	   /* DWARF3f */
-
-#define DEBUG_PREFIX "/usr/lib/debug" /* Path where debug-versions of binaries
-					 are stored */
 
 /* permissions module */
 #define ATTACKER_EXEC 0x1

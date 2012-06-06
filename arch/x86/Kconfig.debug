@@ -284,4 +284,6 @@ config DEBUG_STRICT_USER_COPY_CHECKS
 
 	  If unsure, or if you run an older (pre 4.4) gcc, say N.
 
+source "kernel/Kconfig.unwind"
+
 endmenu

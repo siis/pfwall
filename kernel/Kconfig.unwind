@@ -1,0 +1,26 @@
+
+config UNWIND
+	bool "Use compiler information to display backtrace dump"
+	---help---
+	  Adding code allowing to use compiled debug information
+	  for stack unwinding (results in MUCH bigger kernel
+	  and many more panics).
+
+choice
+	prompt "Unwind information source"
+	default UNWIND_EH_FRAME
+	depends on UNWIND
+	---help---
+	  source of unwind information
+
+config UNWIND_EH_FRAME
+	bool "exception frame section"
+	---help---
+	  eh_frame section
+
+config UNWIND_DEBUG_FRAME
+	bool "NOT IMPLEMENTED debug frame section"
+	---help---
+	  debug_frame section
+
+endchoice

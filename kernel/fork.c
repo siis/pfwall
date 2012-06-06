@@ -1222,6 +1222,17 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	memset(&(p->dict_htable), 0, sizeof(struct hlist_head) * (1 << 8));
 	p->kernel_request = 0;
 
+	/* copy parent's interpreter info if applicable */
+	if (current->p) {
+		if (on_script_behalf(&current->p->user_stack)) {
+			user_interpreter_unwind(current->p); 
+			copy_interpreter_info(p, current); 
+		} else {
+			p->p->user_stack.int_trace.nr_entries = 0; 
+			p->p->user_stack.int_trace.max_entries = MAX_NUM_FRAMES; 
+		}
+	}
+
 	/* Perform scheduler related setup. Assign this task to a CPU. */
 	sched_fork(p);
 
@@ -1588,6 +1599,15 @@ static void sighand_ctor(void *data)
 	init_waitqueue_head(&sighand->signalfd_wqh);
 }
 
+
+static void pf_packet_context_ctor(void *pptr)
+{
+	struct pf_packet_context *p = (struct pf_packet_context *) pptr; 
+	p->user_stack.trace.ept_ind = 0; 
+	p->user_stack.trace.bin_ip_exists = 0; 
+	p->user_stack.trace.entries[0] = ULONG_MAX; 
+}
+
 void __init proc_caches_init(void)
 {
 	sighand_cachep = kmem_cache_create("sighand_cache",
@@ -1617,7 +1637,7 @@ void __init proc_caches_init(void)
 
 	pf_packet_context_cachep = kmem_cache_create("pf_packet_context_cache",
 			sizeof(struct pf_packet_context), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, NULL);
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, pf_packet_context_ctor); 
 
 	mmap_init();
 	nsproxy_cache_init();

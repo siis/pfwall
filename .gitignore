@@ -83,4 +83,9 @@ GTAGS
 
 *.orig
 *~
+
+# tomoyo
+security/tomoyo
+
 \#*#
+

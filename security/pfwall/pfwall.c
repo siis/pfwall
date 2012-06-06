@@ -84,7 +84,6 @@ DEFINE_RWLOCK(pf_context_modules_array_lock);
 EXPORT_SYMBOL(pf_context_modules_array_lock);
 
 /* Performance counters */
-PFW_PERF_INIT(pft_interface_context);
 PFW_PERF_INIT(pft_strcmp_binary_path);
 PFW_PERF_INIT(pft_strcmp_vm_area);
 PFW_PERF_INIT(pft_strcmp_process_label);
@@ -578,133 +577,15 @@ int pft_return_target(struct pf_packet_context *p, void *target_specific_data)
 	return PF_RETURN;
 }
 
-static int copy_stack_frame_user(const void __user *fp,
-			struct stack_frame_user *frame)
+static inline int log(unsigned int num)
 {
-	int ret;
-
-	if (!access_ok(VERIFY_READ, fp, sizeof(*frame)))
-		return 0;
-
-	ret = 1;
-	pagefault_disable();
-	if (__copy_from_user_inatomic(frame, fp, sizeof(*frame)))
-		ret = 0;
-	pagefault_enable();
-
-	return ret;
+	int l = 0;
+	while (num) {
+		l++;
+		num = num >> 1;
+	}
+	return l - 1;
 }
-
-static inline void __static_save_stack_trace_user(struct static_stack_trace *trace)
-{
-	const struct pt_regs *regs = task_pt_regs(current);
-	const void __user *fp = (const void __user *)regs->bp;
-
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = regs->ip;
-
-	while (trace->nr_entries < trace->max_entries) {
-		struct stack_frame_user frame;
-
-		frame.next_fp = NULL;
-		frame.ret_addr = 0;
-		if (!copy_stack_frame_user(fp, &frame))
-			break;
-		if ((unsigned long)fp < regs->sp)
-			break;
-		if (frame.ret_addr) {
-			trace->entries[trace->nr_entries++] =
-				frame.ret_addr;
-		}
-		if (fp == frame.next_fp)
-			break;
-		fp = frame.next_fp;
-	}
-}
-
-void static_save_stack_trace_user(struct static_stack_trace *trace)
-{
-	/*
-	 * Trace user stack if we are not a kernel thread
-	 */
-	if (current->mm) {
-		__static_save_stack_trace_user(trace);
-	}
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = ULONG_MAX;
-}
-
-void pft_libc_nonshared(struct pf_packet_context *p)
-{
-	struct pt_regs *ptregs = (struct pt_regs *)
-			(current->thread.sp0 - sizeof (struct pt_regs));
-	int syscall_number = ptregs->ax;
-	if (syscall_number == __NR_mknod ||
-		syscall_number == __NR_mknodat ||
-		syscall_number == __NR_fstat ||
-		syscall_number == __NR_lstat ||
-		syscall_number == __NR_stat64 ||
-		syscall_number == __NR_lstat64 ||
-		syscall_number == __NR_fstat64 ||
-		syscall_number == __NR_fstatat64) {
-		p->trace_first_program_ip ++;
-	}
-}
-
-int pft_interface_context(struct pf_packet_context *p)
-{
-	int ret = 0;
-
-	p->trace_first_program_ip = -1;
-	p->program_ip_exists = 0;
-//	strcpy(p->vm_area_inoden[0], "none");
-
-	if (!current->mm) {
-		ret = -EINVAL;
-		goto end;
-	}
-
-	/* Fill actual stack trace */
-	p->trace.nr_entries	= 0;
-	p->trace.max_entries	= MAX_NUM_FRAMES;
-	p->trace.skip		= 0;
-
-	static_save_stack_trace_user(&(p->trace));
-	pft_vm_area_inode_context(p);
-
-	/* Below is needed only for advanced stacktrace, where
-		unrolling of stack has to simultaneously take
-		place with the VM area, so debug info can be
-		retrieved.  However, this hurts performance */
-//	ret = pft_stacktrace_and_vm_area_context(p);
-//	if (ret < 0)
-//		goto end;
-
-	/* Now, get interpreter context */
-	/* TODO: We are now forced to get the binary path name,
-	even in MATCH_REPR */
-	if (!(p->context & PF_CONTEXT_BINARY_PATH))
-		pft_binary_path_context(p);
-
-//	ret = pft_interpreter_context(p);
-end:
-	if (ret < 0 || p->trace_first_program_ip == -1) {
-//		printk(KERN_INFO PFWALL_PFX "p->trace_first_program_ip is invalid: %s\n", current->comm);
-	} else {
-		/* Now, deal with system calls that make use of
-		 * the static libc_nonshared.a -- just skip one
-		 * frame back */
-
-		pft_libc_nonshared(p);
-	}
-
-	if (ret == 0) {
-		p->context |= PF_CONTEXT_INTERFACE;
-	}
-
-	return ret;
-}
-
 
 
 int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific_data)
@@ -715,7 +596,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	if (!pfwall_lazy_context_evaluation_enabled) {
 		/* Calculate all context beforehand */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			ret = pft_interface_context(p);
+			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -723,16 +604,15 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 		}
 		#ifdef PFWALL_MATCH_STR
 		if (!(p->context & PF_CONTEXT_BINARY_PATH)) {
-			pft_binary_path_context(p);
+			pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p);
 		}
 		#endif
 		#ifdef PFWALL_MATCH_REPR
 		if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-			pft_binary_path_inode_context(p);
+			pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p); 
 		}
 		#endif
 	}
-//	PFW_PERF_EXTERN_INIT(pft_interface_context);
 //	PFW_PERF_EXTERN_INIT(pft_strcmp);
 
 	/* TODO: Totally lazy matching; don't match anything unless needed */
@@ -761,7 +641,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	/* Match binary path */
 	#ifdef PFWALL_MATCH_STR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH)) {
-		pft_binary_path_context(p);
+		pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p); 
 	}
 	if (!(!strcmp(def->binary_path, "") ||
 		!strcmp(def->binary_path, p->info.binary_path)))
@@ -769,7 +649,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	#endif
 	#ifdef PFWALL_MATCH_REPR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-		pft_binary_path_inode_context(p);
+		pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p); 
 	}
 	if (!(def->binary_inoden == 0 || def->binary_inoden == p->info.binary_inoden))
 	#endif
@@ -850,7 +730,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 
 		/* We have to get the context of the interface */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			ret = pft_interface_context(p);
+			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -858,14 +738,15 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 		}
 
 #endif
-		while (i < p->interpreter_info.nr_entries) {
-			#ifdef PFWALL_MATCH_STR
-			if (!strcmp(def->script_path, p->interpreter_info.script_filename[i])) {
-			#endif
+		while (i < p->user_stack.int_trace.nr_entries) {
+			if (!strcmp(def->script_path, p->user_stack.int_trace.int_filename[i])) {
+			/* TODO: no reliable way of resolving script filename into inode? */
+			#if 0
 			#ifdef PFWALL_MATCH_REPR
-			if (def->script_inoden == p->interpreter_info.script_inoden[i]) {
+			if (def->script_inoden == p->user_stack.int_trace.[i]) {
 			#endif
-				if ((def->script_line_number == 0) || (def->script_line_number == p->interpreter_info.line_number[i]))
+			#endif 
+				if ((def->script_line_number == 0) || (def->script_line_number == p->user_stack.int_trace.entries[i]))
 					return 1;
 			}
 			i++;
@@ -886,9 +767,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 
 		/* We have to get the context of the interface */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			PFW_PERF_START(pft_interface_context);
-			ret = pft_interface_context(p);
-			PFW_PERF_END(pft_interface_context);
+			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -916,12 +795,12 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 			 * from the binary. We need to match that */
 			/* Backtrack until the VM area name is the
 			 * one we are looking for */
-			while (i < MAX_NUM_FRAMES && p->trace.entries[i] && p->trace.entries[i] != 0xFFFFFFFF) {
+			while (i < MAX_NUM_FRAMES && p->user_stack.trace.entries[i] && p->user_stack.trace.entries[i] != 0xFFFFFFFF) {
 				#ifdef PFWALL_MATCH_STR
 				if (!strcmp(p->vm_area_strings[i], "")) {
 				#endif
 				#ifdef PFWALL_MATCH_REPR
-				if (p->vm_area_inoden[i] == 0) {
+				if (p->user_stack.trace.vma_inoden[i] == 0) {
 				#endif
 					return 0;
 				}
@@ -931,9 +810,9 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 				PFW_PERF_END(pft_strcmp_vm_area);
 				#endif
 				#ifdef PFWALL_MATCH_REPR
-				if (def->vm_area_inoden == p->vm_area_inoden[i]) {
+				if (def->vm_area_inoden == p->user_stack.trace.vma_inoden[i]) {
 				#endif
-					if (def->interface == (p->trace.entries[i] - p->vma_start[i])) {
+					if (def->interface == (p->user_stack.trace.entries[i] - p->user_stack.trace.vma_start[i])) {
 					PFW_PERF_END(pft_strcmp_interface);
 						return 1;
 					}
@@ -987,9 +866,7 @@ int pft_register_default_modules(void)
 
 	/* TODO: We are calling pft_interface_context manually, so this is of no
 	use. Instead, register data and syscall modules */
-	pf_register_context(PF_CONTEXT_INTERFACE, &pft_interface_context);
 	pf_register_context(PF_CONTEXT_FILENAME, &pft_auditdata_context);
-	pf_register_context(PF_CONTEXT_VM_AREA_STRINGS, &pft_vm_area_name_context);
 	pf_register_context(PF_CONTEXT_TYPE, &pft_type_context);
 	pf_register_context(PF_CONTEXT_BINARY_PATH, &pft_binary_path_context);
 	pf_register_context(PF_CONTEXT_BINARY_PATH_INODE, &pft_binary_path_inode_context);
@@ -1420,7 +1297,6 @@ pft_rule_counter_write(struct file *filp, const char __user *ubuf,
 
 	/* Performance counters */
 
-	PFW_PERF_RESET(pft_interface_context);
 	PFW_PERF_RESET(pft_strcmp_vm_area);
 	PFW_PERF_RESET(pft_strcmp_binary_path);
 	PFW_PERF_RESET(pft_strcmp_process_label);
@@ -1588,7 +1464,6 @@ pft_perf_read(struct file *file, char __user *ubuf,
 	char *buf;
 
 	/* This is used to fire the relay_fs for pft_performance */
-	PFW_PERF_PRINT(pft_interface_context);
 	PFW_PERF_PRINT(pft_strcmp_vm_area);
 	PFW_PERF_PRINT(pft_strcmp_binary_path);
 	PFW_PERF_PRINT(pft_strcmp_process_label);
@@ -2358,16 +2233,6 @@ void pfwall_audit(struct pf_packet_context *p)
 	return;
 }
 
-inline int log(unsigned int num)
-{
-	int l = 0;
-	while (num) {
-		l++;
-		num = num >> 1;
-	}
-	return l - 1;
-}
-
 /* TODO: The two functions below perform the same function, only,
  * for pft_entry and pft_match. Is there a generic way to do this? */
 
@@ -2477,7 +2342,7 @@ int pft_filter(struct pf_packet_context *p, struct pft_entry *first, struct pft_
 			ret = update_match_context(m, p);
 			/* An error, or this hook has not sufficient context */
 			if (ret < 0) {
-				printk(KERN_INFO PFWALL_PFX "Error in getting match context for rule: %d\n", e->id);
+				printk(KERN_INFO PFWALL_PFX "Error (%d) in getting match context for rule: %d\n", ret, e->id);
 				goto next_rule;
 				// goto end;
 			}
@@ -2520,7 +2385,7 @@ int pft_filter(struct pf_packet_context *p, struct pft_entry *first, struct pft_
 		ret = update_target_context(t, p);
 
 		if (ret < 0) {
-			printk(KERN_INFO PFWALL_PFX "Error in getting target context for rule: %d\n", e->id);
+			printk(KERN_INFO PFWALL_PFX "Error (%d) in getting target context for rule: %d\n", ret, e->id);
 			goto next_rule;
 			// goto end;
 		}
@@ -2600,23 +2465,23 @@ int pft_do_filter(int hook, struct pf_packet_context *p)
 		select chains for each interface on the
 		backtrace */
 	if (!(p->context & PF_CONTEXT_INTERFACE)) {
-		ret = pft_interface_context(p);
+		ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
 		if (ret < 0) {
 			verdict = PF_ACCEPT;
 			goto end;
 		}
 	}
 
-	while (i < MAX_NUM_FRAMES && p->trace.entries[i] && p->trace.entries[i] != 0xFFFFFFFF) {
+	while (i < MAX_NUM_FRAMES && p->user_stack.trace.entries[i] && p->user_stack.trace.entries[i] != 0xFFFFFFFF) {
 		#ifdef PFWALL_MATCH_STR
 		if (!strcmp(p->vm_area_strings[i], "")) {
 		#endif
 		#ifdef PFWALL_MATCH_REPR
-		if (p->vm_area_inoden[i] == 0) {
+		if (p->user_stack.trace.vma_inoden[i] == 0) {
 		#endif
 			goto end;
 		}
-		index = pft_hash(p->trace.entries[i] - p->vma_start[i]);
+		index = pft_hash(p->user_stack.trace.entries[i] - p->user_stack.trace.vma_start[i]);
 		verdict = pft_filter(p, pft_filter_table.input_chain[index]);
 //			if (verdict == PF_ACCEPT || verdict == PF_DROP)
 //				goto end;
@@ -2649,16 +2514,16 @@ int pft_do_filter(int hook, struct pf_packet_context *p)
 			pft_interface_context(p);
 		p->context |= PF_CONTEXT_INTERFACE;
 
-		while (i < MAX_NUM_FRAMES && p->trace.entries[i] && p->trace.entries[i] != 0xFFFFFFFF) {
+		while (i < MAX_NUM_FRAMES && p->user_stack.trace.entries[i] && p->user_stack.trace.entries[i] != 0xFFFFFFFF) {
 			#ifdef PFWALL_MATCH_STR
 			if (!strcmp(p->vm_area_strings[i], "")) {
 			#endif
 			#ifdef PFWALL_MATCH_REPR
-			if (p->vm_area_inoden[i] == 0) {
+			if (p->user_stack.trace.vma_inoden[i] == 0) {
 			#endif
 				goto end;
 			}
-			index = pft_hash(p->trace.entries[i] - p->vma_start[i]);
+			index = pft_hash(p->user_stack.trace.entries[i] - p->user_stack.trace.vma_start[i]);
 			verdict = pft_filter(p, pft_filter_table.output_chain[index]);
 //			if (verdict == PF_ACCEPT || verdict == PF_DROP)
 //				goto end;
@@ -2913,8 +2778,8 @@ void pf_packet_free(void)
 	}
 	current->p->data = NULL;
 	current->p->data_count = 0;
-	current->p->interpreter_info.nr_entries = 0;
-	current->p->trace.nr_entries = 0;
+	current->p->user_stack.int_trace.nr_entries = 0;
+	current->p->user_stack.trace.nr_entries = 0;
 	current->p->context = 0;
 	# endif
 	/* Packet is destroyed when process exits */
@@ -2932,7 +2797,7 @@ void pf_packet_free(void)
 //	# if 0
 	if (current->p) {
 //		memset(current->p, 0, sizeof(struct static_stack_trace));
-//		current->p->trace.entries[0] = 0xFFFFFFFF;
+//		current->p->user_stack.trace.entries[0] = 0xFFFFFFFF;
 //		for (i = 0; i < MAX_NUM_FRAMES; i++)
 //			current->p->vm_area_strings[i][0] = '\0';
 //		memset(current->p, 0, sizeof(struct pf_packet_context));
@@ -3206,12 +3071,12 @@ decided_here:
 			p->context &= ~PF_CONTEXT_INTERFACE;
 			p->context &= ~PF_CONTEXT_VM_AREA_STRINGS;
 			p->context &= ~PF_CONTEXT_SYSCALL_FILENAME;
-			p->interpreter_info.nr_entries = 0;
-			p->trace.nr_entries = 0;
+			p->user_stack.int_trace.nr_entries = 0;
+			p->user_stack.trace.nr_entries = 0;
 			p->context = 0; /* Binary path context available till exec hook */
 		} else if (hook == PF_HOOK_SYSCALL_BEGIN) {
-			p->interpreter_info.nr_entries = 0;
-			p->trace.nr_entries = 0;
+			p->user_stack.int_trace.nr_entries = 0;
+			p->user_stack.trace.nr_entries = 0;
 			p->context = 0;
 			/* TODO: If we do invalidation properly, we don't need this.
 			   Also, binary path context available till exec hook */

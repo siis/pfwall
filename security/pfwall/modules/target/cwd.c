@@ -31,6 +31,7 @@
 /* Perl is included because of it always having . as the last part of its @INC */
 char *uprogs[] = { "perl", "ls", "find", "cp", "mv", "rm", "chmod",
 	"grep", "tar", "mkdir", "ln", "setfiles", "awk", "sed", "touch", "pwd", 0 };
+EXPORT_SYMBOL(uprogs);
 
 /* TODO: Make this into a dictionary if we are keeping this */
 static int in_utility_programs(char *comm)

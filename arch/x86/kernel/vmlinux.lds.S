@@ -114,6 +114,9 @@ SECTIONS
 
 	NOTES :text :note
 
+	/* Exception (header) frames */
+	EH_FRAME
+
 	EXCEPTION_TABLE(16) :text = 0x9090
 
 #if defined(CONFIG_DEBUG_RODATA)
@@ -335,7 +338,9 @@ SECTIONS
 
 	/* Sections to be discarded */
 	DISCARDS
+#ifndef CONFIG_UNWIND_EH_FRAME
 	/DISCARD/ : { *(.eh_frame) }
+#endif
 }
 
 

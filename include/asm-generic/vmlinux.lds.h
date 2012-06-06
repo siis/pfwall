@@ -602,6 +602,18 @@
 #define TRACEDATA
 #endif
 
+#ifdef CONFIG_UNWIND_EH_FRAME
+#define EH_FRAME							\
+	VMLINUX_SYMBOL(__eh_frame_hdr_start) = .;			\
+	.eh_frame_hdr : { *(.eh_frame_hdr) }				\
+	VMLINUX_SYMBOL(__eh_frame_hdr_end) = .;				\
+	VMLINUX_SYMBOL(__eh_frame_start) = .;				\
+	.eh_frame : { *(.eh_frame) }					\
+	VMLINUX_SYMBOL(__eh_frame_end) = .;
+#else
+#define EH_FRAME
+#endif
+
 #define NOTES								\
 	.notes : AT(ADDR(.notes) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start_notes) = .;			\

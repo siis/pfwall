@@ -110,6 +110,12 @@ obj-$(CONFIG_USER_RETURN_NOTIFIER) += user-return-notifier.o
 obj-$(CONFIG_PADATA) += padata.o
 obj-$(CONFIG_CRASH_DUMP) += crash_dump.o
 obj-$(CONFIG_JUMP_LABEL) += jump_label.o
+obj-$(CONFIG_UNWIND) += dwarf.o
+obj-$(CONFIG_UNWIND) += dwarf-read.o
+obj-$(CONFIG_UNWIND) += dwarf-cfi.o
+obj-$(CONFIG_UNWIND) += dwarf-expression.o
+obj-$(CONFIG_UNWIND) += dwarf-fde.o
+obj-$(CONFIG_UNWIND) += unwind.o
 
 ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
