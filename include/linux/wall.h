@@ -240,16 +240,21 @@ struct user_stack_info {
 #define EPT_VMA_OFFSET(addr, us) ((addr) + (us->trace.vma_start[us->trace.ept_ind]))
 #define EPT_INO(t) (t->user_stack.trace.vma_inoden[t->user_stack.trace.ept_ind])
 
-static inline ino_t ept_inode_get(struct user_stack_info *us)                                                                                                                                                                                
+static inline ino_t ept_inode_get(struct user_stack_info *us)
 {
     return us->trace.vma_inoden[us->trace.ept_ind];
 }
-#if 0
-static unsigned long ept_offset_get(struct user_stack_info *us)
+
+static inline unsigned long us_entry_offset_get(struct user_stack_info *us, int i)
 {
-    return us->trace.entries[us->trace.ept_ind] - us->trace.vma_start[us->trace.ept_ind];
+    return us->trace.entries[i] - us->trace.vma_start[i];
 }
-#endif 
+
+static inline unsigned long ept_offset_get(struct user_stack_info *us)
+{
+    return us_entry_offset_get(us, us->trace.ept_ind); 
+}
+
 static inline int valid_user_stack(struct user_stack_info *us)
 {
     return (us->trace.entries[0] != ULONG_MAX);

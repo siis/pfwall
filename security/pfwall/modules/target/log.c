@@ -367,22 +367,94 @@ end:
 	return str;
 }
 
-void get_proc_hier(char *s, int len)
+char *pft_get_process_hierarchy_str(struct task_struct *t)
 {
-	struct task_struct *curr = current;
-	int b = 0;
-	while (curr->pid >= 2) {
-		/* We don't want swapper or init processes */
-		b += sprintf(s + b, "%s,", curr->comm);
-		if (b >= len)
-			break;
+	/* 'bash', 'init' */
+	struct task_struct *curr = t; 
+	int c = 0;
+
+	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
+	if (!s)
+		goto out; 
+
+	while (curr->pid >= 1) { /* we don't want swapper processes */
+		if (strlen(curr->comm) + c + 4 > PAGE_SIZE)
+			break; 
+		c += sprintf(s + c, "'%s'", curr->comm);
+		if (curr == curr->parent) /* init process */
+			break; 
+		c += sprintf(s + c, ",");
 		curr = curr->parent;
 	}
+
+out:
+	return s; 
 }
 
 int pft_log_duplicate(char *log_str)
 {
 	return 0;
+}
+
+char *pft_get_process_stack_str(struct pf_packet_context *p)
+{
+	/* {'entry':'0xbf000000','file':'/lib/ld.so'}, ... */
+	int i = 0, sz, curr = 0; 
+	char entry_str[] = "'entry'";
+	char vma_str[] = "'file'";
+	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
+	
+	if (!s)
+		goto out; 
+
+	for (i = 0; i < p->user_stack.trace.nr_entries - 1; i++) {
+		/* overflow check */
+		sz = strlen(p->user_stack.trace.vm_area_strings[i]) + 
+			strlen(entry_str) + strlen(vma_str) + 20; 
+		if (sz + curr > PAGE_SIZE)
+			break; 
+
+		curr += sprintf(s + curr, "{%s:'0x%lx',%s:'%s'}", entry_str, 
+				us_entry_offset_get(&p->user_stack, i), vma_str, 
+				p->user_stack.trace.vm_area_strings[i]); 
+
+		if (i != p->user_stack.trace.nr_entries - 2)
+			curr += sprintf(s + curr, ","); 
+	}
+
+out:
+	return s; 
+}
+
+char *pft_get_interpreter_stack_str(struct pf_packet_context *p)
+{
+	/* {'entry':'4','file':'test.sh'}, ... */
+	int i = 0, sz, curr = 0; 
+	char entry_str[] = "'entry'";
+	char vma_str[] = "'file'";
+
+	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
+	
+	if (!s)
+		goto out; 
+
+	for (i = 0; i < p->user_stack.int_trace.nr_entries; i++) {
+		/* overflow check */
+		sz = strlen(p->user_stack.int_trace.int_filename[i]) + 
+			strlen(entry_str) + strlen(vma_str) + 20; 
+		if (sz + curr > PAGE_SIZE)
+			break; 
+
+		curr += sprintf(s + curr, "{%s:'%lu',%s:'%s'}", entry_str, 
+				p->user_stack.int_trace.entries[i], vma_str,
+				p->user_stack.int_trace.int_filename[i]); 
+
+		if (i != p->user_stack.int_trace.nr_entries - 1)
+			curr += sprintf(s + curr, ","); 
+	}
+
+out:
+	return s; 
 }
 
 int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
@@ -391,156 +463,85 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	char *stack_str = NULL; /* String for stack backtrace */
 	char *core_log_str = NULL; /* String to check for duplication */
 	char *log_str = NULL;
+	char *phier_s = NULL; /* process heirarchy string */
 
-	int i;
 	int rc = 0;
-	int pos = 0; /* Position in strings */
 
 	struct pt_regs *ptregs = (struct pt_regs *)
 			(current->thread.sp0 - sizeof (struct pt_regs));
 	int sn = ptregs->ax;
 
-	/* Userstack backtrace - limited by MAX_NUM_FRAMES */
-	# if 0
-	/* TODO: There is some bug here or in freeing stack_str */
-	stack_str = kzalloc(256, GFP_ATOMIC); /* 11 commas, 2 number, 8 * 32 entries, 1 \0 = 270*/
-	if (!stack_str) {
-		printk(KERN_INFO PFWALL_PFX "stack_str allocation failed\n");
-		rc = -ENOMEM;
+	stack_str = pft_get_process_stack_str(p); 
+	if (!stack_str)
+		goto end; 
+	interpreter_str = pft_get_interpreter_stack_str(p); 
+	if (!interpreter_str)
+		goto end; 
+
+	phier_s = pft_get_process_hierarchy_str(current); 
+	if (!phier_s)
 		goto end;
-	}
-	if (p->trace_first_program_ip == 0) {
-		/* Go on */
-		sprintf(stack_str, "0");
-		goto interpreter;
-	}
-	i = p->trace_first_program_ip;
-	while (p->trace.entries[i] != 0xffffffff)
-		i++;
-	num_frames = i - p->trace_first_program_ip;
 
-	pos += sprintf(stack_str, "%u,", (num_frames <= 10) ? num_frames : 10);
-
-	i = p->trace_first_program_ip;
-	while (p->trace.entries[i] != 0xffffffff) {
-//		if (i == p->trace_first_program_ip)
-		pos += sprintf(stack_str + pos, GFP_ATOMIC, "%lx,", p->trace.entries[i] - p->vma_start[i]);
-//		else
-//			tmp_stack_str = kasprintf(GFP_ATOMIC, "%lx,", p->trace.entries[i]); /* Don't care -- FIXME */
-		i++;
-		/* Stop entries whose stack trace goes on forever. Why does this happen? */
-		if (i - p->trace_first_program_ip > MAX_NUM_FRAMES)
-			break;
-	}
-
-interpreter:
-	#endif
-
-	/* Interpreter stack backtrace - limited by MAX_INT_LOG */
-	if (p->user_stack.int_trace.nr_entries > 0) {
-		pos = 0;
-		interpreter_str = kzalloc(MAX_INT_LOG, GFP_ATOMIC);
-		if (!interpreter_str) {
-			printk(KERN_INFO PFWALL_PFX "interpreter_str allocation failed\n");
-			rc = -ENOMEM;
+	if (lt->context & PF_CONTEXT_SYSCALL_ARGS) {
+		char *str = kmalloc(MAX_LOG_STRLEN, GFP_ATOMIC);
+		log_str = kasprintf(GFP_ATOMIC, "%s: %s", lt->string, 
+				syscall_value_as_string(str, lt->arg_num, lt->offset, lt->type));
+		kfree(str);
+	} else if (lt->context & PF_CONTEXT_FILENAME) {
+		log_str = kasprintf(GFP_ATOMIC, "%s: %lu", lt->string,
+				p->info.filename_inoden);
+	} else if (lt->context & PF_CONTEXT_SYSCALL_FILENAME) {
+		if (!p->syscall_filename) {
+			/* Happens if request is through a file descriptor. */
 			goto end;
 		}
-
-		pos += sprintf(interpreter_str, "%u,", p->user_stack.int_trace.nr_entries);
-		i = 0;
-		while (i < p->user_stack.int_trace.nr_entries) {
-			int len;
-			len = strlen(p->user_stack.int_trace.int_filename[i]) + 10;
-			if (pos + len >= MAX_INT_LOG)
-				break;
-			pos += sprintf(interpreter_str + pos,
-			"%s:%lu,", p->user_stack.int_trace.int_filename[i],
-			p->user_stack.int_trace.entries[i]);
-			i++;
+		/* TODO: Make this a match module */
+		if (!strcmp(p->syscall_filename, ".") &&
+			((!strcmp(p->info.binary_path, "/bin/dash")) ||
+			 (!strcmp(p->info.binary_path, "/bin/bash")))
+		   ) {
+			/* Special case */
+			goto end;
 		}
+		log_str = kasprintf(GFP_ATOMIC, "%s", p->syscall_filename);
+	} else {
+		log_str = kasprintf(GFP_ATOMIC, "{'object': {'filename': '%s', 'mac_label': '%s',"
+				"'st_ino': '%lu'}, 'operation': {'counter': '%lu', 'syscall_nr': '%d(%lu)',"
+				"'tclass': '%d', 'requested': '%u'}", 
+			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
+			p->info.tcontext, p->info.filename_inoden, _current_trace, 
+			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, p->info.tclass, p->info.requested); 
 	}
 
-	/* Core log string */
+	if (!log_str)
+		goto end;
 
-	if (p->user_stack.trace.ept_ind != 1) {
-		/* Log the details in the relay channel */
-//		rdtscl(time_end);
-//		printk(KERN_INFO "time_wall: time to get stack backtrace: %d", time_end - time_strt);
-
-		/* String to log is determined by the context
-		 * requested */
-		if (lt->context & PF_CONTEXT_SYSCALL_ARGS) {
-			char *str = kmalloc(MAX_LOG_STRLEN, GFP_ATOMIC);
-			log_str = kasprintf(GFP_ATOMIC, "%s: %s", lt->string, syscall_value_as_string(str, lt->arg_num, lt->offset, lt->type));
-			kfree(str);
-		} else if (lt->context & PF_CONTEXT_FILENAME) {
-			log_str = kasprintf(GFP_ATOMIC, "%s: %lu", lt->string,
-					p->info.filename_inoden);
-		} else if (lt->context & PF_CONTEXT_SYSCALL_FILENAME) {
-			if (!p->syscall_filename) {
-				/* Happens if request is through a file descriptor. */
-				goto end;
-			}
-			/* TODO: Make this a match module */
-			if (!strcmp(p->syscall_filename, ".") &&
-				((!strcmp(p->info.binary_path, "/bin/dash")) ||
-				 (!strcmp(p->info.binary_path, "/bin/bash")))
-			   ) {
-				/* Special case */
-				goto end;
-			}
-			log_str = kasprintf(GFP_ATOMIC, "%s", p->syscall_filename);
-		} else {
-			log_str = kasprintf(GFP_ATOMIC, "(%s,%s,%u,%u),%s,%lu,%d:%s,%s", // ,%d,%d,%d\n",
-
-				p->info.scontext, p->info.tcontext, p->info.tclass, p->info.requested,
-				(strlen(p->info.filename) != 0) ? p->info.filename : "none",
-				p->info.filename_inoden,
-				p->data_count, (p->data_count > 0) ? p->data : "none",
-				(p->user_stack.int_trace.nr_entries > 0) ? interpreter_str : "none"
-//				p->trace.entries[0] - p->vma_start[0],
-//				p->trace.entries[1] - p->vma_start[1],
-//				p->trace.entries[2] - p->vma_start[2]
-				);
-		}
-		if (!log_str)
+	if (!pft_log_duplicate(log_str)) {
+		core_log_str = kasprintf(GFP_ATOMIC, "{'pfwall_log_entry': {'process': {'ancestors': [%s],"
+				"'binary': '%s', 'dac_label': '0%o', 'mac_label': '%s', 'pid': '%d',"
+				"'entrypoint_index': '%d', 'process_stack': [%s], 'script_stack': [%s]}, %s}}\n", 
+				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid, 
+				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str); 
+		if (!core_log_str)
 			goto end;
-		/* PID, Interface is printed always */
-		if (!pft_log_duplicate(log_str)) {
-			char *phier_s = kmalloc(MAX_PROC_HIER, GFP_ATOMIC);
-			if (!phier_s)
-				goto end;
-			get_proc_hier(phier_s, MAX_PROC_HIER);
-			core_log_str = kasprintf(GFP_ATOMIC, "TR%d(%d)-[%d,%d],%lu),%d,%s:%s,1,%lx,%s,%s\n",
-			sn, (sn == __NR_socketcall) ? ptregs->bx : 0,
-			current->cred->fsuid,
-			(p->context & PF_CONTEXT_DAC_BINDERS) ? p->sys_fname_attacker_uid : -1,
-			_current_trace,
-			p->info.pid,
-			p->info.binary_path,
-			p->user_stack.trace.vm_area_strings[p->user_stack.trace.ept_ind], 
-			p->user_stack.trace.entries[p->user_stack.trace.ept_ind] - 
-				p->user_stack.trace.vma_start[p->user_stack.trace.ept_ind], 
-			log_str,
-			phier_s);
-			kfree(phier_s);
-			if (!core_log_str)
-				goto end;
-			current->kernel_request++;
-			relay_write(wall_rchan, core_log_str, strlen(core_log_str) + 1);
-			current->kernel_request--;
-		}
+
+		current->kernel_request++;
+		relay_write(wall_rchan, core_log_str, strlen(core_log_str));
+		current->kernel_request--;
 	}
 
 end:
 	if (interpreter_str)
-		kfree(interpreter_str);
+		free_page((unsigned long) interpreter_str); 
 	if (stack_str)
-		kfree(stack_str);
+		free_page((unsigned long) stack_str); 
 	if (log_str)
 		kfree(log_str);
 	if (core_log_str)
 		kfree(core_log_str);
+	if (phier_s)
+		free_page((unsigned long) phier_s); 
+
 	return rc;
 }
 

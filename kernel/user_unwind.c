@@ -620,10 +620,10 @@ static inline void __static_save_stack_trace_user(struct static_stack_trace *tra
 	const struct pt_regs *regs = task_pt_regs(current);
 	const void __user *fp = (const void __user *)regs->bp;
 
-	if (trace->nr_entries < trace->max_entries)
+	if (trace->nr_entries < trace->max_entries - 1)
 		trace->entries[trace->nr_entries++] = regs->ip;
 
-	while (trace->nr_entries < trace->max_entries) {
+	while (trace->nr_entries < trace->max_entries - 1) {
 		struct stack_frame_user frame;
 
 		frame.next_fp = NULL;
@@ -654,8 +654,10 @@ void static_save_stack_trace_user(struct static_stack_trace *trace)
 		/* Garbage IP */
 		trace->nr_entries--;
 	}
+	/* 
 	if (trace->nr_entries < trace->max_entries)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
+	*/
 }
 
 static inline void us_init(struct user_stack_info *us)
@@ -686,9 +688,8 @@ static inline void us_init(struct user_stack_info *us)
  * Call it only in process contexts with a userspace mm.
  *
  * Invariants:
- * 	On exit, if (nr_entries < max_entries) then
- * 	trace.entries[nr_entries - 1] = ULONG_MAX.
- *  Each trace.entries up to trace.entries[nr_entries - 1]
+ * 	On exit, trace.entries[nr_entries - 1] = ULONG_MAX.
+ *  Each trace.entries up to trace.entries[nr_entries - 2]
  *  has a valid VMA. If nr_entries == 1 (=> ULONG_MAX),
  *  user stack completely invalid.
  */
@@ -742,7 +743,7 @@ void user_unwind(struct task_struct *t)
 		if (eh_len == 0) {
 			/* If only the binary itself doesn't have eh_frame, we can still get ept_ind */
 			if (t->user_stack.trace.nr_entries > 0 && IS_BIN_VMA(t, vma) &&
-				(t->user_stack.trace.nr_entries < t->user_stack.trace.max_entries)) {
+				(t->user_stack.trace.nr_entries < t->user_stack.trace.max_entries - 1)) {
 				update_us(t, vma, unw.regs.ip);
 			} else {
 				/* Else, do a full normal stack trace */
@@ -775,12 +776,12 @@ void user_unwind(struct task_struct *t)
 			update_us(t, vma, unw.regs.ip);
 
 		} while (((ret = unw_step(&unw, &ed, stack_end, stack_start)) == 0) &&
-					(us->trace.nr_entries < us->trace.max_entries));
+					(us->trace.nr_entries < us->trace.max_entries - 1));
 
 		/* If unw_step failed because of anything other than
-			eh_frame_hdr lookup (-ENOENT), break out. -ENOENT is
-			ok, as it signifies the next VMA region for stack IPs.
-			-ENOENT is returned only by lookup(). */
+			eh_frame_hdr lookup (-ENOENT), or loop stopped due to max_entries, 
+			break out. -ENOENT is ok, as it signifies the next VMA region for
+			stack IPs.  -ENOENT is returned only by lookup(). */
 		if (ret != -ENOENT)
 			goto fail_put_region_pages;
 		/* Release pinned pages */
@@ -793,9 +794,10 @@ fail_put_stack_pages:
 	put_user_pages_range(stack_pgs, np_st);
 end:
 	PFWALL_DBG("\n==========================\n");
-	/* pfwall-specific: Fill last entry */
-	if (us->trace.nr_entries < us->trace.max_entries)
-		us->trace.entries[us->trace.nr_entries++] = ULONG_MAX;
+	/* pfwall-specific: Fill last entry. There is always space for this because
+	 * nr_entries can only become at most max_entries - 2 above (and in 
+	 * fp unrolling code).  */
+	us->trace.entries[us->trace.nr_entries++] = ULONG_MAX;
 
 	return;
 }
