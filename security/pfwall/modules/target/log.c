@@ -504,9 +504,9 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 		}
 		log_str = kasprintf(GFP_ATOMIC, "%s", p->syscall_filename);
 	} else {
-		log_str = kasprintf(GFP_ATOMIC, "{'object': {'filename': '%s', 'mac_label': '%s',"
-				"'st_ino': '%lu'}, 'operation': {'counter': '%lu', 'syscall_nr': '%d(%lu)',"
-				"'tclass': '%d', 'requested': '%u'}", 
+		log_str = kasprintf(GFP_ATOMIC, "\"object\": {\"filename\": \"%s\", \"mac_label\": \"%s\","
+				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%lu\", \"syscall_nr\": \"%d(%lu)\","
+				"\"tclass\": \"%d\", \"requested\": \"%u\"}", 
 			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
 			p->info.tcontext, p->info.filename_inoden, _current_trace, 
 			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, p->info.tclass, p->info.requested); 
@@ -516,9 +516,9 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 		goto end;
 
 	if (!pft_log_duplicate(log_str)) {
-		core_log_str = kasprintf(GFP_ATOMIC, "{'pfwall_log_entry': {'process': {'ancestors': [%s],"
-				"'binary': '%s', 'dac_label': '0%o', 'mac_label': '%s', 'pid': '%d',"
-				"'entrypoint_index': '%d', 'process_stack': [%s], 'script_stack': [%s]}, %s}}\n", 
+		core_log_str = kasprintf(GFP_ATOMIC, "- {\"process\": {\"ancestors\": [%s],"
+				"\"binary\": \"%s\", \"dac_label\": \"0%o\", \"mac_label\": \"%s\", \"pid\": \"%d\","
+				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s}\n", 
 				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid, 
 				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str); 
 		if (!core_log_str)
