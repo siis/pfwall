@@ -317,8 +317,7 @@ struct pf_packet_context {
 	struct user_stack_info user_stack; 
 
 	struct proc_info info;
-	unsigned long trace_first_program_ip; /* index in trace of first IP in program, -1 if invalid */
-	int program_ip_exists; /* 1 if exists; 0 if not, if 0, above points to the last library IP before 0xffffffff, or is -1 if invalid */
+
 	int hook; /* Current hook being traversed */
 	int hook_mask; /* Which hooks decisions need be made on
 	* as context becomes available */

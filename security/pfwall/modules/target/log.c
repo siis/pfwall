@@ -141,18 +141,17 @@ int pft_type_context(struct pf_packet_context *p)
 
 	/* Extract type from context */
 	stype = context_to_type(scontext);
-	if (stype == NULL) {
-		rc = -EINVAL; /* Initial SID */
-		goto end;
-	}
 	ttype = context_to_type(tcontext);
-	if (ttype == NULL) {
-		rc = -EINVAL; /* Initial SID */
-		goto end;
-	}
 
-	strcpy(p->info.scontext, stype);
-	strcpy(p->info.tcontext, ttype);
+	if (stype)
+		strcpy(p->info.scontext, stype);
+	else
+		strcpy(p->info.scontext, scontext); /* initial sid */
+
+	if (ttype)
+		strcpy(p->info.tcontext, ttype);
+	else
+		strcpy(p->info.tcontext, tcontext); /* initial sid */
 
 	# if 0
 	p->info.scontext	= kstrdup(stype, GFP_ATOMIC);

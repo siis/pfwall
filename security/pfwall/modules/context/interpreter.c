@@ -430,6 +430,7 @@ void copy_interpreter_info(struct task_struct *c, struct task_struct *p)
 		memcpy(c->p->user_stack.int_trace.int_filename, p->p->user_stack.int_trace.int_filename, 
 				MAX_NUM_FRAMES * INT_FNAME_MAX); 
 	}
+	c->p->user_stack.int_trace.nr_entries = p->p->user_stack.int_trace.nr_entries; 
 }
 EXPORT_SYMBOL(copy_interpreter_info); 
 

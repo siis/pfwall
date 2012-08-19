@@ -2745,8 +2745,9 @@ void pf_packet_allocate(void)
 	# endif
 	/* Packet is allocated when process is created */
 	/* TODO: Why is it NULL sometimes? */
-	if (current->p)
-		memset(current->p, 0, sizeof(struct pf_packet_context));
+	if (current->p) 
+		current->p->user_stack.trace.nr_entries = 0; 
+		// memset(current->p, 0, sizeof(struct pf_packet_context));
 	/* TODO: Call pfwall_check sysentry hook directly from assembly in entry_32.S */
 	pfwall_check(PF_HOOK_SYSCALL_BEGIN);
 
@@ -3071,11 +3072,9 @@ decided_here:
 			p->context &= ~PF_CONTEXT_INTERFACE;
 			p->context &= ~PF_CONTEXT_VM_AREA_STRINGS;
 			p->context &= ~PF_CONTEXT_SYSCALL_FILENAME;
-			p->user_stack.int_trace.nr_entries = 0;
 			p->user_stack.trace.nr_entries = 0;
 			p->context = 0; /* Binary path context available till exec hook */
 		} else if (hook == PF_HOOK_SYSCALL_BEGIN) {
-			p->user_stack.int_trace.nr_entries = 0;
 			p->user_stack.trace.nr_entries = 0;
 			p->context = 0;
 			/* TODO: If we do invalidation properly, we don't need this.
