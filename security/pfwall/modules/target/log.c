@@ -380,7 +380,7 @@ char *pft_get_process_hierarchy_str(struct task_struct *t)
 		if (strlen(curr->comm) + c + 4 > PAGE_SIZE)
 			break; 
 		c += sprintf(s + c, "'%s'", curr->comm);
-		if (curr == curr->parent) /* init process */
+		if (curr->pid == 1) /* init process' parent is swapper */
 			break; 
 		c += sprintf(s + c, ",");
 		curr = curr->parent;
