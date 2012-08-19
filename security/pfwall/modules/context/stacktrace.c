@@ -578,7 +578,7 @@ static void vma_start_ino(struct task_struct *t)
 	int i = 0;
 	unsigned long ip, sp;
 
-	for (i = 0; i < us->trace.max_entries; i++) {
+	for (i = 0; i < us->trace.max_entries - 1; i++) {
 		ip = us->trace.entries[i];
 		sp = us->trace.stack_bases[i]; 
 		if (ip == ULONG_MAX) {
@@ -618,12 +618,12 @@ static inline void __static_save_stack_trace_user(struct static_stack_trace *tra
 	const struct pt_regs *regs = task_pt_regs(current);
 	const void __user *fp = (const void __user *)regs->bp;
 
-	if (trace->nr_entries < trace->max_entries) {
+	if (trace->nr_entries < trace->max_entries - 1) {
 		trace->stack_bases[trace->nr_entries] = regs->bp; 
 		trace->entries[trace->nr_entries++] = regs->ip;
 	}
 
-	while (trace->nr_entries < trace->max_entries) {
+	while (trace->nr_entries < trace->max_entries - 1) {
 		struct stack_frame_user frame;
 
 		frame.next_fp = NULL;
@@ -656,8 +656,8 @@ void static_save_stack_trace_user(struct static_stack_trace *trace)
 		/* Garbage IP */
 		trace->nr_entries--;
 	}
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = ULONG_MAX;
+	/* if (trace->nr_entries < trace->max_entries)
+		trace->entries[trace->nr_entries++] = ULONG_MAX; */
 }
 
 static inline void us_init(struct user_stack_info *us)
@@ -688,9 +688,8 @@ static inline void us_init(struct user_stack_info *us)
  * Call it only in process contexts with a userspace mm.
  *
  * Invariants:
- * 	On exit, if (nr_entries < max_entries) then
- * 	trace.entries[nr_entries - 1] = ULONG_MAX.
- *  Each trace.entries up to trace.entries[nr_entries - 1]
+ * 	On exit, trace.entries[nr_entries - 1] = ULONG_MAX.
+ *  Each trace.entries up to trace.entries[nr_entries - 2]
  *  has a valid VMA. If nr_entries == 1 (=> ULONG_MAX),
  *  user stack completely invalid.
  */
@@ -748,7 +747,7 @@ void user_unwind(struct pf_packet_context *p)
 		if (eh_len == 0) {
 			/* If only the binary itself doesn't have eh_frame, we can still get ept_ind */
 			if (t->p->user_stack.trace.nr_entries > 0 && IS_BIN_VMA(t, vma) &&
-				(t->p->user_stack.trace.nr_entries < t->p->user_stack.trace.max_entries)) {
+				(t->p->user_stack.trace.nr_entries < t->p->user_stack.trace.max_entries - 1)) {
 				update_us(t, vma, unw.regs.ip, unw.regs.sp);
 			} else {
 				/* Else, do a full normal stack trace */
@@ -781,7 +780,7 @@ void user_unwind(struct pf_packet_context *p)
 			update_us(t, vma, unw.regs.ip, unw.regs.sp);
 
 		} while (((ret = unw_step(&unw, &ed, stack_end, stack_start)) == 0) &&
-					(us->trace.nr_entries < us->trace.max_entries));
+					(us->trace.nr_entries < us->trace.max_entries - 1));
 
 		/* If unw_step failed because of anything other than
 			eh_frame_hdr lookup (-ENOENT), break out. -ENOENT is
@@ -800,8 +799,7 @@ fail_put_stack_pages:
 end:
 	PFWALL_DBG("\n==========================\n");
 	/* pfwall-specific: Fill last entry */
-	if (us->trace.nr_entries < us->trace.max_entries)
-		us->trace.entries[us->trace.nr_entries++] = ULONG_MAX;
+	us->trace.entries[us->trace.nr_entries++] = ULONG_MAX;
 
 	return;
 }
