@@ -381,7 +381,7 @@ char *pft_get_process_hierarchy_str(struct task_struct *t)
 		if (strlen(curr->comm) + c + 4 > PAGE_SIZE)
 			break; 
 		c += sprintf(s + c, "\"%s\"", curr->comm);
-		if (curr->pid == 1) /* init process' parent is swapper */
+		if (curr->pid == 1 || curr->parent->pid == 0) /* init process' parent is swapper */
 			break; 
 		c += sprintf(s + c, ",");
 		curr = curr->parent;
@@ -402,8 +402,12 @@ char *pft_get_process_stack_str(struct pf_packet_context *p)
 	int i = 0, sz, curr = 0; 
 	char entry_str[] = "\"entry\"";
 	char vma_str[] = "\"file\"";
-	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
-	
+	char *s = NULL; 
+
+	if (!valid_user_stack(&p->user_stack))
+		goto out; 
+
+	s = (char *) get_zeroed_page(GFP_KERNEL); 	
 	if (!s)
 		goto out; 
 
@@ -607,7 +611,7 @@ static int __init pft_log_target_init(void)
 
 	printk(KERN_INFO PFWALL_PFX "log target initializing\n");
 
-	wall_rchan = relay_open("wall_interfaces", NULL, 1024 * 1024, 8, &wall_interfaces_relay_callbacks, &dropped);
+	wall_rchan = relay_open("wall_interfaces", NULL, 1024 * 1024, 16, &wall_interfaces_relay_callbacks, &dropped);
 	if (!wall_rchan) {
 		printk(KERN_INFO PFWALL_PFX "log: relay_open() failed\n");
 		return 1;

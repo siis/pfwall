@@ -1714,7 +1714,7 @@ static int __init pf_pfwall_init(void)
 
 	/* Enabling pfwall */
 	printk(KERN_INFO PFWALL_PFX "Enabling\n");
-	pfwall_enabled = 1;
+	pfwall_enabled = 0;
 
 	/* cache for packet context */
 	pf_packet_context_cache = kmem_cache_create("pf_packet_context", sizeof(struct pf_packet_context), PAGE_SIZE, 0, NULL);
@@ -2390,7 +2390,7 @@ int pft_filter(struct pf_packet_context *p, struct pft_entry *first, struct pft_
 		ret = update_target_context(t, p);
 
 		if (ret < 0) {
-			printk(KERN_INFO PFWALL_PFX "Error (%d) in getting target context for rule: %d\n", ret, e->id);
+			// printk(KERN_INFO PFWALL_PFX "Error (%d) in getting target context for rule: %d\n", ret, e->id);
 			goto next_rule;
 			// goto end;
 		}
@@ -2897,11 +2897,17 @@ int pfwall_check(int hook, ...)
 	struct pf_packet_context *p = NULL; /* Details of current "packet" */
 
 	int decision = PF_DROP, rc = 0;
+	int sn; 
 
 	if (!pfwall_enabled)
 		goto end;
 	if (current->kernel_request > 0)
 		goto end;
+
+	/* for now, only deal with name resolution calls */
+	sn = syscall_get_nr(current, task_pt_regs(current)); 
+	if (!in_set(sn, first_arg_set) && !in_set(sn, second_arg_set))
+		goto end; 
 
 	/* Ignore the log daemon */
 	if (current->pid == pf_log_daemon_pid)

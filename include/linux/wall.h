@@ -831,3 +831,82 @@ int connect_call(int sn);
 /* selinux helper utility functions */
 extern char *tclass_str(u16 tclass); 
 extern char *requested_str(u16 tclass, u32 requested); 
+
+#if 0
+/* system call sets -- to identify name resolution calls */
+static int first_arg_set[] = {
+    __NR_open,
+    __NR_creat,
+    __NR_link,
+    /* __NR_unlink, */
+    /* __NR_execve, */
+    __NR_chdir,
+    __NR_mknod,
+    __NR_chmod,
+    __NR_mount,
+    __NR_utime,
+    __NR_access,
+    /* __NR_rename, */
+    __NR_mkdir,
+    /* __NR_rmdir, */
+    __NR_chroot,
+    __NR_symlink,
+    __NR_readlink,
+    __NR_uselib,
+    __NR_swapon,
+    __NR_truncate,
+    __NR_statfs,
+    __NR_swapoff,
+    __NR_chown,
+    __NR_truncate64,
+    __NR_lchown32,
+    __NR_mount,
+    __NR_pivot_root,
+    __NR_utimes,
+    __NR_stat,
+    __NR_lstat,
+    __NR_stat64,
+    __NR_lstat64,
+    __NR_setxattr,
+    __NR_lsetxattr,
+    __NR_getxattr,
+    __NR_lgetxattr,
+    __NR_listxattr,
+    __NR_llistxattr,
+    __NR_removexattr,
+    __NR_lremovexattr,
+    __NR_statfs64,
+    __NR_symlinkat,
+    -1
+};
+
+static int second_arg_set[] = {
+    __NR_quotactl,
+    __NR_inotify_add_watch,
+    __NR_openat,
+    __NR_mkdirat,
+    __NR_mknodat,
+    __NR_fchownat,
+    __NR_futimesat,
+    __NR_fstatat64,
+    __NR_unlinkat,
+    __NR_renameat,
+    __NR_linkat,
+    __NR_readlinkat,
+    __NR_fchmodat,
+    __NR_faccessat,
+    __NR_utimensat,
+    __NR_name_to_handle_at,
+    -1
+};
+
+static inline int in_set(int sn, int *array)
+{
+	int i;
+	for (i = 0; array[i] != -1; i++)
+		if (sn == array[i])
+			return 1; 
+	return 0;
+}
+
+#endif 
