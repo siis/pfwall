@@ -2916,11 +2916,21 @@ int pfwall_check(int hook, ...)
 	if (in_atomic()) {
 //		printk(KERN_INFO PFWALL_PFX "in_atomic: %s: %s, %s, %c, %c\n", p->info.binary_path, p->info.scontext, p->info.tcontext, p->info.tclass, p->info.requested);
 		goto end;
-	}
+	} 
 //	if (in_atomic())
 //		goto end;
+
+	/* no process context for kernel threads */
 	if (current->mm == NULL)
 		goto end;
+
+	/* for paths that already hold mmap_sem, we cannot introspect into userspace, as a page 
+	 * fault may cause a deadlock (see note arch/x86/mm/fault.c:1092 in do_page_fault) */
+	if (!down_read_trylock(&current->mm->mmap_sem)) {
+		goto end; 
+	}
+	up_read(&current->mm->mmap_sem); 
+
 
 	/* Skip-hook optimization */
 	if (pfwall_skip_hook_enabled)
