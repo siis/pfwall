@@ -21,6 +21,7 @@
 #include <linux/socket.h>
 #include <net/sock.h>
 #include <net/af_unix.h>
+#include <linux/time.h>
 
 #include "../../av_permissions.h"
 #include "../../flask.h"
@@ -463,6 +464,7 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	char *core_log_str = NULL; /* String to check for duplication */
 	char *log_str = NULL;
 	char *phier_s = NULL; /* process heirarchy string */
+	struct timespec ts; /* real wall clock time */
 
 	int rc = 0;
 
@@ -480,6 +482,8 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	phier_s = pft_get_process_hierarchy_str(current); 
 	if (!phier_s)
 		goto end;
+
+	ktime_get_real_ts(&ts); 
 
 	if (lt->context & PF_CONTEXT_SYSCALL_ARGS) {
 		char *str = kmalloc(MAX_LOG_STRLEN, GFP_ATOMIC);
@@ -505,12 +509,15 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 		log_str = kasprintf(GFP_ATOMIC, "%s", p->syscall_filename);
 	} else {
 		log_str = kasprintf(GFP_ATOMIC, "\"object\": {\"filename\": \"%s\", \"mac_label\": \"%s\","
-				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%lu\", \"syscall_nr\": \"%d(%lu)\","
-				"\"tclass\": \"%s\", \"requested\": \"%s\"}", 
+				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%d\", \"syscall_nr\": \"%d(%lu)\","
+				"\"tclass\": \"%d\", \"requested\": \"%u\", \"time\": {\"sec\":\"%ld\", \"nsec\":\"%ld\"}}", 
 			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
-			p->info.tcontext, p->info.filename_inoden, _current_trace, 
+			p->info.tcontext, p->info.filename_inoden, 
+			atomic_read(&_syscall_ctr), 
 			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, 
-			tclass_str(p->info.tclass), requested_str(p->info.tclass, p->info.requested)); 
+			p->info.tclass, p->info.requested, ts.tv_sec, ts.tv_nsec
+			); 
+			// tclass_str(p->info.tclass), requested_str(p->info.tclass, p->info.requested)); 
 	}
 
 	if (!log_str)

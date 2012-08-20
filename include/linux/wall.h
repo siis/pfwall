@@ -697,6 +697,9 @@ int pft_get_uid_with_permission(int flags, const char __user *filename);
 extern atomic_t pfw_syscalls_invoked[NR_syscalls + 1];
 extern atomic_t pfw_socketcalls_invoked[NR_socketcalls + 1];
 
+/* global system call counter */
+extern atomic_t _syscall_ctr; 
+
 /* Basic Performance macros */
 
 #define MAX_CTR 100000

@@ -103,8 +103,13 @@ PFW_PERF_EXTERN_INIT(sys_getpid);
 PFW_PERF_EXTERN_INIT(sys_execve);
 PFW_PERF_EXTERN_INIT(sys_fork);
 
+/* same across each invocation of pfwall */
 unsigned long _current_trace = 0;
 EXPORT_SYMBOL(_current_trace);
+
+/* same across each system call */
+atomic_t _syscall_ctr = ATOMIC_INIT(0);
+EXPORT_SYMBOL(_syscall_ctr);
 
 /* Performance counters file */
 /*
@@ -2745,6 +2750,7 @@ void pf_packet_allocate(void)
 	# endif
 	/* Packet is allocated when process is created */
 	/* TODO: Why is it NULL sometimes? */
+	atomic_inc(&_syscall_ctr); 
 	if (current->p) 
 		current->p->user_stack.trace.nr_entries = 0; 
 		// memset(current->p, 0, sizeof(struct pf_packet_context));
