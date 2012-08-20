@@ -506,10 +506,11 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	} else {
 		log_str = kasprintf(GFP_ATOMIC, "\"object\": {\"filename\": \"%s\", \"mac_label\": \"%s\","
 				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%lu\", \"syscall_nr\": \"%d(%lu)\","
-				"\"tclass\": \"%d\", \"requested\": \"%u\"}", 
+				"\"tclass\": \"%s\", \"requested\": \"%s\"}", 
 			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
 			p->info.tcontext, p->info.filename_inoden, _current_trace, 
-			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, p->info.tclass, p->info.requested); 
+			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, 
+			tclass_str(p->info.tclass), requested_str(p->info.tclass, p->info.requested)); 
 	}
 
 	if (!log_str)

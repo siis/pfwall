@@ -824,3 +824,7 @@ extern int nosym_set[];
 extern int in_set(int sn, int *array);
 int bind_call(int sn);
 int connect_call(int sn);
+
+/* selinux helper utility functions */
+extern char *tclass_str(u16 tclass); 
+extern char *requested_str(u16 tclass, u32 requested); 

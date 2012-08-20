@@ -17,6 +17,11 @@
 #include <asm/unistd.h>
 #include <asm/siginfo.h>
 
+// #include "../selinux/include/avc_ss.h"
+// #include "../selinux/include/classmap.h"
+
+#include "avc_ss.h"
+
 #define PFWALL_HASH_BITS            16
 /* String -> ULong hash */
 unsigned long pfwall_hash(unsigned char *str)
@@ -727,3 +732,26 @@ int in_set(int sn, int *array)
 	return 0;
 }
 EXPORT_SYMBOL(in_set);
+
+char *tclass_str(u16 tclass)
+{
+	return secclass_map[tclass-1].name; 
+}
+
+char *requested_str(u16 tclass, u32 av)
+{
+	const char **perms; 
+	int i = 0, perm = 1; 
+
+	perms = secclass_map[tclass-1].perms;
+
+	while (i < (sizeof(av) * 8)) {
+		if ((perm & av) && perms[i]) {
+			return perms[i]; 
+		}
+		i++;
+		perm <<= 1;
+	}
+
+	return NULL; 
+}
