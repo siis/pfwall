@@ -2751,8 +2751,10 @@ void pf_packet_allocate(void)
 	/* Packet is allocated when process is created */
 	/* TODO: Why is it NULL sometimes? */
 	atomic_inc(&_syscall_ctr); 
-	if (current->p) 
+	if (current->p) {
 		current->p->user_stack.trace.nr_entries = 0; 
+		current->p->auditdata = NULL; /* TODO: where getting set? */
+	}
 		// memset(current->p, 0, sizeof(struct pf_packet_context));
 	/* TODO: Call pfwall_check sysentry hook directly from assembly in entry_32.S */
 	pfwall_check(PF_HOOK_SYSCALL_BEGIN);
