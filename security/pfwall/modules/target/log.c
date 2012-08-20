@@ -380,7 +380,7 @@ char *pft_get_process_hierarchy_str(struct task_struct *t)
 	while (curr->pid >= 1) { /* we don't want swapper processes */
 		if (strlen(curr->comm) + c + 4 > PAGE_SIZE)
 			break; 
-		c += sprintf(s + c, "'%s'", curr->comm);
+		c += sprintf(s + c, "\"%s\"", curr->comm);
 		if (curr->pid == 1) /* init process' parent is swapper */
 			break; 
 		c += sprintf(s + c, ",");
@@ -398,10 +398,10 @@ int pft_log_duplicate(char *log_str)
 
 char *pft_get_process_stack_str(struct pf_packet_context *p)
 {
-	/* {'entry':'0xbf000000','file':'/lib/ld.so'}, ... */
+	/* {"entry":"0xbf000000","file":"/lib/ld.so"}, ... */
 	int i = 0, sz, curr = 0; 
-	char entry_str[] = "'entry'";
-	char vma_str[] = "'file'";
+	char entry_str[] = "\"entry\"";
+	char vma_str[] = "\"file\"";
 	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
 	
 	if (!s)
@@ -414,7 +414,7 @@ char *pft_get_process_stack_str(struct pf_packet_context *p)
 		if (sz + curr > PAGE_SIZE)
 			break; 
 
-		curr += sprintf(s + curr, "{%s:'0x%lx',%s:'%s'}", entry_str, 
+		curr += sprintf(s + curr, "{%s:\"0x%lx\",%s:\"%s\"}", entry_str, 
 				us_entry_offset_get(&p->user_stack, i), vma_str, 
 				p->user_stack.trace.vm_area_strings[i]); 
 
@@ -430,8 +430,8 @@ char *pft_get_interpreter_stack_str(struct pf_packet_context *p)
 {
 	/* {'entry':'4','file':'test.sh'}, ... */
 	int i = 0, sz, curr = 0; 
-	char entry_str[] = "'entry'";
-	char vma_str[] = "'file'";
+	char entry_str[] = "\"entry\"";
+	char vma_str[] = "\"file\"";
 
 	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
 	
@@ -445,7 +445,7 @@ char *pft_get_interpreter_stack_str(struct pf_packet_context *p)
 		if (sz + curr > PAGE_SIZE)
 			break; 
 
-		curr += sprintf(s + curr, "{%s:'%lu',%s:'%s'}", entry_str, 
+		curr += sprintf(s + curr, "{%s:\"%lu\",%s:\"%s\"}", entry_str, 
 				p->user_stack.int_trace.entries[i], vma_str,
 				p->user_stack.int_trace.int_filename[i]); 
 
@@ -524,9 +524,9 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 		goto end;
 
 	if (!pft_log_duplicate(log_str)) {
-		core_log_str = kasprintf(GFP_ATOMIC, "- {\"process\": {\"ancestors\": [%s],"
+		core_log_str = kasprintf(GFP_ATOMIC, "{\"process\": {\"ancestors\": [%s],"
 				"\"binary\": \"%s\", \"dac_label\": \"0%o\", \"mac_label\": \"%s\", \"pid\": \"%d\","
-				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s}\n", 
+				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n", 
 				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid, 
 				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str); 
 		if (!core_log_str)
