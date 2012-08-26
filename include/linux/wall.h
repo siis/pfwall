@@ -218,10 +218,10 @@ struct static_stack_trace {
 	int bin_ip_exists; /* Does entrypoint exist in program? */
 	int ept_ind; /* Entrypoint index */
 	/* inode and start address for each VMA in program trace */
-	ino_t vma_inoden[MAX_NUM_FRAMES]; 
-	unsigned long vma_start[MAX_NUM_FRAMES]; 
+	ino_t vma_inoden[MAX_NUM_FRAMES];
+	unsigned long vma_start[MAX_NUM_FRAMES];
 	char vm_area_strings[MAX_NUM_FRAMES][PATH_MAX];
-}; 
+};
 
 /* interpreter stack trace */
 struct interpreter_stack_trace {
@@ -229,13 +229,16 @@ struct interpreter_stack_trace {
 	/* line numbers */
 	unsigned long entries[MAX_NUM_FRAMES];
 	/* filename for each script file in the stack trace */
-	char int_filename[MAX_NUM_FRAMES][INT_FNAME_MAX]; 
-}; 
+	char int_filename[MAX_NUM_FRAMES][INT_FNAME_MAX];
+};
 
 struct user_stack_info {
 	struct static_stack_trace trace;
-	struct interpreter_stack_trace int_trace; 
-}; 
+	struct interpreter_stack_trace int_trace;
+};
+
+#define VMA_INO(vma) (vma->vm_file->f_dentry->d_inode->i_ino)
+#define EXE_INO(t) (t->mm->exe_file->f_dentry->d_inode->i_ino)
 
 #define EPT_VMA_OFFSET(addr, us) ((addr) + (us->trace.vma_start[us->trace.ept_ind]))
 #define EPT_INO(t) (t->user_stack.trace.vma_inoden[t->user_stack.trace.ept_ind])
@@ -252,33 +255,33 @@ static inline unsigned long us_entry_offset_get(struct user_stack_info *us, int 
 
 static inline unsigned long ept_offset_get(struct user_stack_info *us)
 {
-    return us_entry_offset_get(us, us->trace.ept_ind); 
+    return us_entry_offset_get(us, us->trace.ept_ind);
 }
 
 static inline int valid_user_stack(struct user_stack_info *us)
 {
-    return (us->trace.entries[0] != ULONG_MAX);
+    return (us->trace.nr_entries > 0);
 }
 
 static inline char *int_ept_filename_get(struct user_stack_info *us)
 {
-	return (us->int_trace.nr_entries > 0) ? (us->int_trace.int_filename[0]) : NULL; 
+	return (us->int_trace.nr_entries > 0) ? (us->int_trace.int_filename[0]) : NULL;
 }
 
 static inline int int_ept_lineno_get(struct user_stack_info *us)
 {
-	return (us->int_trace.nr_entries > 0) ? (us->int_trace.entries[0]) : 0; 
+	return (us->int_trace.nr_entries > 0) ? (us->int_trace.entries[0]) : 0;
 }
 
 static inline int int_ept_exists(struct user_stack_info *us)
 {
-	return (us->int_trace.nr_entries > 0); 
+	return (us->int_trace.nr_entries > 0);
 }
 
-extern int is_interpreter(struct task_struct *t); 
-extern int user_interpreter_unwind(struct pf_packet_context *p); 
-extern struct int_bt_info *on_script_behalf(struct user_stack_info *us); 
-extern void copy_interpreter_info(struct task_struct *c, struct task_struct *p); 
+extern int is_interpreter(struct task_struct *t);
+extern int user_interpreter_unwind(struct pf_packet_context *p);
+extern struct int_bt_info *on_script_behalf(struct user_stack_info *us);
+extern void copy_interpreter_info(struct task_struct *c, struct task_struct *p);
 
 #if 0
 struct static_stack_trace {
@@ -293,7 +296,7 @@ struct interpreter_info {
 	unsigned long script_inoden[MAX_NUM_FRAMES];
 	unsigned long line_number[MAX_NUM_FRAMES];
 };
-#endif 
+#endif
 
 struct stack_frame_user {
 	const void __user	*next_fp;
@@ -314,7 +317,7 @@ struct pft_entry;
 
 struct pf_packet_context {
 	/* userstack and interpreter entrypoints */
-	struct user_stack_info user_stack; 
+	struct user_stack_info user_stack;
 
 	struct proc_info info;
 
@@ -341,7 +344,7 @@ struct pf_packet_context {
 
 	/* UID of user that can attack filename resource
 		syscall_filename */
-	uid_t sys_fname_attacker_uid; 
+	uid_t sys_fname_attacker_uid;
 };
 
 extern struct kmem_cache *pf_packet_context_cachep;
@@ -691,14 +694,14 @@ struct inode_security_struct_pfwall {
 #define ATTACKER_PREBIND 0x80
 /* If exists, then delete and create permissions, else just create permission */
 #define ATTACKER_BIND 0x100
-int pft_get_uid_with_permission(int flags, const char __user *filename); 
+int pft_get_uid_with_permission(int flags, const char __user *filename);
 
 /* syscall_invoked module */
 extern atomic_t pfw_syscalls_invoked[NR_syscalls + 1];
 extern atomic_t pfw_socketcalls_invoked[NR_socketcalls + 1];
 
 /* global system call counter */
-extern atomic_t _syscall_ctr; 
+extern atomic_t _syscall_ctr;
 
 /* Basic Performance macros */
 
@@ -789,7 +792,7 @@ extern unsigned long _nfwall_counter;
 #define GRP_MEMB_MAX 32
 
 /* Return value space augment */
-#define PFW_UID_NO_MATCH MAX_USERS 
+#define PFW_UID_NO_MATCH MAX_USERS
 
 /* Extended attributes */
 #define ATTACKER_XATTR_PREFIX "security."
@@ -829,8 +832,8 @@ int bind_call(int sn);
 int connect_call(int sn);
 
 /* selinux helper utility functions */
-extern char *tclass_str(u16 tclass); 
-extern char *requested_str(u16 tclass, u32 requested); 
+extern char *tclass_str(u16 tclass);
+extern char *requested_str(u16 tclass, u32 requested);
 
 #if 0
 /* system call sets -- to identify name resolution calls */
@@ -905,8 +908,8 @@ static inline int in_set(int sn, int *array)
 	int i;
 	for (i = 0; array[i] != -1; i++)
 		if (sn == array[i])
-			return 1; 
+			return 1;
 	return 0;
 }
 
-#endif 
+#endif

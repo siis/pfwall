@@ -445,7 +445,7 @@ done:
 	}
 	free_page((unsigned long) buf);
 }
-#endif 
+#endif
 
 static inline int stack_guard_page(struct vm_area_struct *vma, unsigned long addr)
 {
@@ -527,73 +527,39 @@ EXPORT_SYMBOL(vma_if_stack_ip);
 				vma->vm_file->f_dentry->d_inode->i_ino)) \
 		)
 
-/* fill in user stack trace entry with given ip, and also fill in its 
+/* fill in user stack trace entry with given ip, and also fill in its
 	vm area inode and start address */
-static void update_us(struct task_struct *t, struct vm_area_struct *vma,
-		unsigned long ip, unsigned long sp)
+static void update_us(struct static_stack_trace *trace,
+		unsigned long ip, unsigned long sp,
+		struct vm_area_struct *vma, ino_t exe_ino)
 {
-	struct user_stack_info *us;
 	int c;
-	ino_t vma_inode;
+	ino_t vma_ino = VMA_INO(vma);
 
-	if (!vma->vm_file)
-		return;
-	vma_inode = vma->vm_file->f_dentry->d_inode->i_ino;
-	us = &(t->p->user_stack);
-	c = us->trace.nr_entries;
-
-	/* Do not fill first IP in next VMA region */
-	if (ip < vma->vm_start || ip > vma->vm_end)
-		return;
-
-	us->trace.entries[c] = ip;
-	us->trace.stack_bases[c] = sp; 
-	if (t->mm->exe_file->f_dentry->d_inode->i_ino == vma_inode) {
+	c = trace->nr_entries;
+	trace->entries[c] = ip;
+	trace->stack_bases[c] = sp;
+	if (exe_ino == vma_ino) {
 		/* Program entry */
-		if (!us->trace.bin_ip_exists) {
+		if (!trace->bin_ip_exists) {
 			/* First program entry */
-			us->trace.ept_ind = c;
-			us->trace.bin_ip_exists = 1;
+			trace->ept_ind = c;
+			trace->bin_ip_exists = 1;
 		}
-	} else if (vma_inode == ld_inode) {
+	} else if (vma_ino == ld_inode) {
 		/* Dynamic loader/linker */
-		us->trace.ept_ind = c;
-		us->trace.bin_ip_exists = 0;
-	} else if (ld_inode == -1 && us->trace.bin_ip_exists == 0) {
+		trace->ept_ind = c;
+		trace->bin_ip_exists = 0;
+	} else if (ld_inode == -1 && trace->bin_ip_exists == 0) {
 		/* Before ld_inode is loaded, assume any IP as loader IP
 		 * if program IP doesn't exist, to avoid errors later */
-		us->trace.ept_ind = c;
-		us->trace.bin_ip_exists = 0;
+		trace->ept_ind = c;
+		trace->bin_ip_exists = 0;
 	}
 	/* VMA start and inode */
-	us->trace.vma_inoden[c] = vma_inode;
-	us->trace.vma_start[c] = vma->vm_start;
-	us->trace.nr_entries++;
-}
-
-static void vma_start_ino(struct task_struct *t)
-{
-	struct user_stack_info *us = &(t->p->user_stack);
-	struct vm_area_struct *vma;
-	int i = 0;
-	unsigned long ip, sp;
-
-	for (i = 0; i < us->trace.max_entries - 1; i++) {
-		ip = us->trace.entries[i];
-		sp = us->trace.stack_bases[i]; 
-		if (ip == ULONG_MAX) {
-			us->trace.nr_entries = i;
-			break;
-		}
-		vma = find_in_vma(t->mm, ip);
-		if (vma == NULL || vma->vm_file == NULL) {
-			us->trace.nr_entries = i;
-			break;
-		}
-		update_us(t, vma, ip, sp);
-	}
-
-	return;
+	trace->vma_inoden[c] = vma_ino;
+	trace->vma_start[c] = vma->vm_start;
+	trace->nr_entries++;
 }
 
 static int copy_stack_frame_user(const void __user *fp,
@@ -613,17 +579,26 @@ static int copy_stack_frame_user(const void __user *fp,
 	return ret;
 }
 
-static inline void __static_save_stack_trace_user(struct static_stack_trace *trace)
+static inline void static_save_stack_trace_user(struct task_struct *t,
+		struct static_stack_trace *trace)
 {
-	const struct pt_regs *regs = task_pt_regs(current);
+	const struct pt_regs *regs = task_pt_regs(t);
 	const void __user *fp = (const void __user *)regs->bp;
+	struct vm_area_struct *vma = NULL;
 
-	if (trace->nr_entries < trace->max_entries - 1) {
-		trace->stack_bases[trace->nr_entries] = regs->bp; 
-		trace->entries[trace->nr_entries++] = regs->ip;
+	/* exit if we are kernel thread */
+	if (!t->mm)
+		return;
+
+	if (trace->nr_entries < trace->max_entries) {
+		vma = find_in_vma(t->mm, regs->ip);
+		if (vma == NULL || vma->vm_file == NULL)
+			return;
+		update_us(trace, (unsigned long) regs->ip, (unsigned long) regs->bp,
+			vma, EXE_INO(t));
 	}
 
-	while (trace->nr_entries < trace->max_entries - 1) {
+	while (trace->nr_entries < trace->max_entries) {
 		struct stack_frame_user frame;
 
 		frame.next_fp = NULL;
@@ -633,31 +608,16 @@ static inline void __static_save_stack_trace_user(struct static_stack_trace *tra
 		if ((unsigned long)fp < regs->sp)
 			break;
 		if (frame.ret_addr) {
-			trace->entries[trace->nr_entries] = 
-				(unsigned long) frame.next_fp; 
-			trace->entries[trace->nr_entries++] =
-				frame.ret_addr;
+			vma = find_in_vma(t->mm, frame.ret_addr);
+			if (vma == NULL || vma->vm_file == NULL)
+				break;
+			update_us(trace, (unsigned long) frame.ret_addr,
+				(unsigned long) frame.next_fp, vma, EXE_INO(t));
 		}
 		if (fp == frame.next_fp)
 			break;
 		fp = frame.next_fp;
 	}
-}
-
-void static_save_stack_trace_user(struct static_stack_trace *trace)
-{
-	/*
-	 * Trace user stack if we are not a kernel thread
-	 */
-	if (current->mm) {
-		__static_save_stack_trace_user(trace);
-	}
-	if (trace->nr_entries == 1) {
-		/* Garbage IP */
-		trace->nr_entries--;
-	}
-	/* if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = ULONG_MAX; */
 }
 
 static inline void us_init(struct user_stack_info *us)
@@ -675,22 +635,37 @@ static inline void us_init(struct user_stack_info *us)
 	} \
 }
 
+static inline int log(unsigned int num)
+{
+	int l = 0;
+	while (num) {
+		l++;
+		num = num >> 1;
+	}
+	return l - 1;
+}
+
+
+void print_random(struct pf_packet_context *p)
+{
+	printk(KERN_INFO PFWALL_PFX "BUG: %s: %d >= %d!!\n", p->syscall_filename,
+			p->user_stack.trace.ept_ind,
+				p->user_stack.trace.max_entries - 1);
+}
+
 /**
  * user_unwind() - Use eh_frame to unwind user stack
  * @t:		Task struct
  *
- * Any trace should go back up to loader or program binary.
- * Successful run can be detected by checking if
- * t->p->user_stack.trace.ept_ind is -1 or not.
+ * Any successful trace should go back up to loader or program binary.
  *
  * Do NOT call this function in improper contexts -
  * !t->mm, in_atomic(), in_irq(), in_interrupt(), irqs_disabled()
  * Call it only in process contexts with a userspace mm.
  *
  * Invariants:
- * 	On exit, trace.entries[nr_entries - 1] = ULONG_MAX.
- *  Each trace.entries up to trace.entries[nr_entries - 2]
- *  has a valid VMA. If nr_entries == 1 (=> ULONG_MAX),
+ *  Each trace.entries up to trace.entries[nr_entries - 1]
+ *  has a valid VMA. If nr_entries == 0,
  *  user stack completely invalid.
  */
 
@@ -705,10 +680,11 @@ void user_unwind(struct pf_packet_context *p)
 	int np_ehf, np_st, ret = 0;
 	struct pt_regs regs;
 	unsigned long stack_start, stack_end;
-	struct task_struct *t = current; 
+	struct task_struct *t = current;
 
 	struct user_stack_info *us = &(t->p->user_stack);
 
+	pf_context_array[log(PF_CONTEXT_SYSCALL_FILENAME)](p);
 	us_init(&(t->p->user_stack));
 
 	/* Initialize first frame from kernel stack */
@@ -745,18 +721,19 @@ void user_unwind(struct pf_packet_context *p)
 		PFWALL_DBG("VMA start: [%s, %lx]\n", t->comm, vma->vm_start);
 		eh_len = get_eh_section(vma, &eh_start);
 		if (eh_len == 0) {
-			/* If only the binary itself doesn't have eh_frame, we can still get ept_ind */
+			/* If only the binary itself doesn't have eh_frame, we can still get ept_ind
+			 * from the current frame */
 			if (t->p->user_stack.trace.nr_entries > 0 && IS_BIN_VMA(t, vma) &&
-				(t->p->user_stack.trace.nr_entries < t->p->user_stack.trace.max_entries - 1)) {
-				update_us(t, vma, unw.regs.ip, unw.regs.sp);
+				(t->p->user_stack.trace.nr_entries < t->p->user_stack.trace.max_entries)) {
+				update_us(&t->p->user_stack.trace, unw.regs.ip, unw.regs.sp,
+							vma, EXE_INO(t));
 			} else {
 				/* Else, do a full normal stack trace */
 
 				PFWALL_ERR(2, "No eh_frame_hdr section, "
 					"reverting to normal trace: [%s]\n", t->comm);
 				us_init(&(t->p->user_stack));
-				static_save_stack_trace_user(&(t->p->user_stack.trace));
-				vma_start_ino(t);
+				static_save_stack_trace_user(t, &(t->p->user_stack.trace));
 			}
 			goto fail_put_stack_pages;
 		}
@@ -776,11 +753,14 @@ void user_unwind(struct pf_packet_context *p)
 				goto fail_put_region_pages;
 			unw_regs(&unw, &regs);
 
-			/* Update IP in user stack trace */
-			update_us(t, vma, unw.regs.ip, unw.regs.sp);
-
+			/* Update IP in user stack trace if it belongs in this VMA.
+			 * If in next VMA, next loop iteration will fill it after
+			 * updating next VMA. */
+			if (unw.regs.ip > vma->vm_start && unw.regs.ip < vma->vm_end)
+				update_us(&t->p->user_stack.trace, unw.regs.ip, unw.regs.sp,
+						vma, EXE_INO(t));
 		} while (((ret = unw_step(&unw, &ed, stack_end, stack_start)) == 0) &&
-					(us->trace.nr_entries < us->trace.max_entries - 1));
+					(us->trace.nr_entries < us->trace.max_entries));
 
 		/* If unw_step failed because of anything other than
 			eh_frame_hdr lookup (-ENOENT), break out. -ENOENT is
@@ -798,8 +778,8 @@ fail_put_stack_pages:
 	put_user_pages_range(stack_pgs, np_st);
 end:
 	PFWALL_DBG("\n==========================\n");
-	/* pfwall-specific: Fill last entry */
-	us->trace.entries[us->trace.nr_entries++] = ULONG_MAX;
+
+	BUG_ON(p->user_stack.trace.ept_ind >= p->user_stack.trace.max_entries);
 
 	return;
 }
@@ -830,7 +810,7 @@ void pft_libc_nonshared(struct pf_packet_context *p)
 		syscall_number == __NR_lstat64 ||
 		syscall_number == __NR_fstat64 ||
 		syscall_number == __NR_fstatat64) {
-		p->user_stack.trace.ept_ind++; 
+		p->user_stack.trace.ept_ind++;
 	}
 }
 
@@ -847,26 +827,23 @@ int pft_interface_context(struct pf_packet_context *p)
 	}
 
 	/* Fill actual stack trace */
-	p->user_stack.trace.nr_entries	= 0;
-	p->user_stack.trace.max_entries	= MAX_NUM_FRAMES;
-
-	user_unwind(p); 
+	user_unwind(p);
 	if (!valid_user_stack(&p->user_stack)) {
-		ret = -EINVAL; 
+		ret = -EINVAL;
 		goto end;
 	}
 
 	/* Now, get interpreter context */
-	ret = user_interpreter_unwind(p); 
-	
+	user_interpreter_unwind(p);
+
 end:
-	if (ret < 0 || p->user_stack.trace.ept_ind == -1) {
+	if (!valid_user_stack(&p->user_stack)) {
+		ret = -EINVAL;
 //		printk(KERN_INFO PFWALL_PFX "p->user_stack.trace.ept_ind is invalid: %s\n", current->comm);
 	} else {
 		/* Now, deal with system calls that make use of
 		 * the static libc_nonshared.a -- just skip one
 		 * frame back */
-
 		pft_libc_nonshared(p);
 	}
 
@@ -899,10 +876,8 @@ int pft_vm_area_name_context(struct pf_packet_context *p)
 	}
 
 	/* Find out and save the first program IP which is not in the library */
-	while (i < MAX_NUM_FRAMES - 1) {
+	while (i < p->user_stack.trace.nr_entries) {
 		address = p->user_stack.trace.entries[i];
-		if (address == ULONG_MAX)
-			break;
 		vma = find_vma(current->mm, address);
 		if (vma == NULL || (vma->vm_file) == NULL || address < vma->vm_start) {
 			if (vma == NULL || address < vma->vm_start) {
