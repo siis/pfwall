@@ -279,7 +279,7 @@ static inline int int_ept_exists(struct user_stack_info *us)
 }
 
 extern int is_interpreter(struct task_struct *t);
-extern int user_interpreter_unwind(struct pf_packet_context *p);
+extern void user_interpreter_unwind(struct pf_packet_context *p);
 extern struct int_bt_info *on_script_behalf(struct user_stack_info *us);
 extern void copy_interpreter_info(struct task_struct *c, struct task_struct *p);
 

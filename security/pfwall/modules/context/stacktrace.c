@@ -628,29 +628,29 @@ static inline void us_init(struct user_stack_info *us)
 	us->trace.ept_ind = 0;
 }
 
+void pft_libc_nonshared(struct pf_packet_context *p)
+{
+	struct pt_regs *ptregs = (struct pt_regs *)
+			(current->thread.sp0 - sizeof (struct pt_regs));
+	int syscall_number = ptregs->ax;
+	if (syscall_number == __NR_mknod ||
+		syscall_number == __NR_mknodat ||
+		syscall_number == __NR_fstat ||
+		syscall_number == __NR_lstat ||
+		syscall_number == __NR_stat64 ||
+		syscall_number == __NR_lstat64 ||
+		syscall_number == __NR_fstat64 ||
+		syscall_number == __NR_fstatat64) {
+		p->user_stack.trace.ept_ind++;
+	}
+}
+
+
 #define CHECK_PRINT_EXIT(f) { \
 	if (f) { \
 		printk(#f); \
 		goto fail; \
 	} \
-}
-
-static inline int log(unsigned int num)
-{
-	int l = 0;
-	while (num) {
-		l++;
-		num = num >> 1;
-	}
-	return l - 1;
-}
-
-
-void print_random(struct pf_packet_context *p)
-{
-	printk(KERN_INFO PFWALL_PFX "BUG: %s: %d >= %d!!\n", p->syscall_filename,
-			p->user_stack.trace.ept_ind,
-				p->user_stack.trace.max_entries - 1);
 }
 
 /**
@@ -684,7 +684,6 @@ void user_unwind(struct pf_packet_context *p)
 
 	struct user_stack_info *us = &(t->p->user_stack);
 
-	pf_context_array[log(PF_CONTEXT_SYSCALL_FILENAME)](p);
 	us_init(&(t->p->user_stack));
 
 	/* Initialize first frame from kernel stack */
@@ -779,6 +778,14 @@ fail_put_stack_pages:
 end:
 	PFWALL_DBG("\n==========================\n");
 
+	if (valid_user_stack(&p->user_stack) && (t->p->user_stack.trace.ept_ind <
+				t->p->user_stack.trace.max_entries - 1)) {
+		/* Now, deal with system calls that make use of
+		 * the static libc_nonshared.a -- just skip one
+		 * frame back */
+		pft_libc_nonshared(p);
+	}
+
 	BUG_ON(p->user_stack.trace.ept_ind >= p->user_stack.trace.max_entries);
 
 	return;
@@ -797,29 +804,9 @@ static int __init user_unwind_init(void)
 }
 fs_initcall(user_unwind_init);
 
-void pft_libc_nonshared(struct pf_packet_context *p)
-{
-	struct pt_regs *ptregs = (struct pt_regs *)
-			(current->thread.sp0 - sizeof (struct pt_regs));
-	int syscall_number = ptregs->ax;
-	if (syscall_number == __NR_mknod ||
-		syscall_number == __NR_mknodat ||
-		syscall_number == __NR_fstat ||
-		syscall_number == __NR_lstat ||
-		syscall_number == __NR_stat64 ||
-		syscall_number == __NR_lstat64 ||
-		syscall_number == __NR_fstat64 ||
-		syscall_number == __NR_fstatat64) {
-		p->user_stack.trace.ept_ind++;
-	}
-}
-
 int pft_interface_context(struct pf_packet_context *p)
 {
 	int ret = 0;
-
-	p->user_stack.trace.ept_ind = -1;
-	p->user_stack.trace.bin_ip_exists = 0;
 
 	if (!current->mm) {
 		ret = -EINVAL;
@@ -837,19 +824,11 @@ int pft_interface_context(struct pf_packet_context *p)
 	user_interpreter_unwind(p);
 
 end:
-	if (!valid_user_stack(&p->user_stack)) {
+	if (!valid_user_stack(&p->user_stack))
 		ret = -EINVAL;
-//		printk(KERN_INFO PFWALL_PFX "p->user_stack.trace.ept_ind is invalid: %s\n", current->comm);
-	} else {
-		/* Now, deal with system calls that make use of
-		 * the static libc_nonshared.a -- just skip one
-		 * frame back */
-		pft_libc_nonshared(p);
-	}
 
-	if (ret == 0) {
+	if (ret == 0)
 		p->context |= PF_CONTEXT_INTERFACE;
-	}
 
 	return ret;
 }
@@ -882,13 +861,11 @@ int pft_vm_area_name_context(struct pf_packet_context *p)
 		if (vma == NULL || (vma->vm_file) == NULL || address < vma->vm_start) {
 			if (vma == NULL || address < vma->vm_start) {
 				ret = -EINVAL;
-				p->user_stack.trace.ept_ind = -1;
 				strcpy(p->user_stack.trace.vm_area_strings[i], "vmanull");
 				goto end;
 			} else if (vma->vm_file == NULL) {
 				/* Why is this happening - file
 				 * may not be mapped in yet */
-				p->user_stack.trace.ept_ind = -1;
 				#ifdef PFWALL_MATCH_STR
 				strcpy(p->user_stack.trace.vm_area_strings[i], "vmafilenull");
 				# endif
