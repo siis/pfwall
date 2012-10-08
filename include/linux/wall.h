@@ -66,7 +66,7 @@
 #define PFWALL_MATCH_REPR
 
 /* Advanced stacktrace - Remember to change paths of libraries */
-#define PFWALL_ADVANCED_STACKTRACE
+// #define PFWALL_ADVANCED_STACKTRACE
 
 #define PFW_UBUNTU_10_04_LIBC_PATH "/lib/tls/i686/cmov/libc-2.11.1.so"
 #define PFW_UBUNTU_10_04_LD_SO_PATH "/lib/ld-2.11.1.so"

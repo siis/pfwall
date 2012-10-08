@@ -814,7 +814,12 @@ int pft_interface_context(struct pf_packet_context *p)
 	}
 
 	/* Fill actual stack trace */
+#ifdef PFWALL_ADVANCED_STACKTRACE
 	user_unwind(p);
+#else
+	us_init(&(p->user_stack));
+	static_save_stack_trace_user(current, &(p->user_stack.trace));
+#endif
 	if (!valid_user_stack(&p->user_stack)) {
 		ret = -EINVAL;
 		goto end;
