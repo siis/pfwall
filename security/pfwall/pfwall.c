@@ -457,8 +457,15 @@ static int pf_translate_sid(struct pft_entry *e)
 	else if (!strcmp(e->def.process_label, "SYSLOW"))
 		e->def.ssid[0] = PFWALL_SID_SYSLOW;
 	else {
-		ret = type_to_sid(e->def.process_label, &(e->def.ssid[0]), 0);
-		ret = type_to_sid(e->def.process_label, &(e->def.ssid[1]), 1);
+		ret = security_context_to_sid(e->def.process_label,
+			strlen(e->def.process_label), &(e->def.ssid[0]));
+		if (ret < 0) {
+			printk(KERN_INFO PFWALL_PFX "failed label to SID conversion: "
+					"%s\n", e->def.process_label);
+			goto out;
+		}
+		// ret = type_to_sid(e->def.process_label, &(e->def.ssid[0]), 0);
+		// ret = type_to_sid(e->def.process_label, &(e->def.ssid[1]), 1);
 	}
 
 	if (strlen(e->def.object_label) == 0)
@@ -468,10 +475,18 @@ static int pf_translate_sid(struct pft_entry *e)
 	else if (!strcmp(e->def.object_label, "SYSLOW"))
 		e->def.tsid[0] = PFWALL_SID_SYSLOW;
 	else {
-		ret = type_to_sid(e->def.object_label, &(e->def.tsid[0]), 0);
-		ret = type_to_sid(e->def.object_label, &(e->def.tsid[1]), 1);
+		ret = security_context_to_sid(e->def.object_label,
+			strlen(e->def.object_label), &(e->def.tsid[0]));
+		if (ret < 0) {
+			printk(KERN_INFO PFWALL_PFX "failed label to SID conversion: "
+					"%s\n", e->def.object_label);
+			goto out;
+		}
+		// ret = type_to_sid(e->def.object_label, &(e->def.tsid[0]), 0);
+		// ret = type_to_sid(e->def.object_label, &(e->def.tsid[1]), 1);
 	}
-	return 0;
+out:
+	return ret;
 	#endif
 	#ifdef PFWALL_MATCH_STR
 	return 0;
@@ -614,7 +629,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 		#endif
 		#ifdef PFWALL_MATCH_REPR
 		if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-			pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p); 
+			pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p);
 		}
 		#endif
 	}
@@ -646,7 +661,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	/* Match binary path */
 	#ifdef PFWALL_MATCH_STR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH)) {
-		pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p); 
+		pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p);
 	}
 	if (!(!strcmp(def->binary_path, "") ||
 		!strcmp(def->binary_path, p->info.binary_path)))
@@ -654,7 +669,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	#endif
 	#ifdef PFWALL_MATCH_REPR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-		pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p); 
+		pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p);
 	}
 	if (!(def->binary_inoden == 0 || def->binary_inoden == p->info.binary_inoden))
 	#endif
@@ -750,7 +765,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 			#ifdef PFWALL_MATCH_REPR
 			if (def->script_inoden == p->user_stack.int_trace.[i]) {
 			#endif
-			#endif 
+			#endif
 				if ((def->script_line_number == 0) || (def->script_line_number == p->user_stack.int_trace.entries[i]))
 					return 1;
 			}
@@ -2750,9 +2765,9 @@ void pf_packet_allocate(void)
 	# endif
 	/* Packet is allocated when process is created */
 	/* TODO: Why is it NULL sometimes? */
-	atomic_inc(&_syscall_ctr); 
+	atomic_inc(&_syscall_ctr);
 	if (current->p) {
-		current->p->user_stack.trace.nr_entries = 0; 
+		current->p->user_stack.trace.nr_entries = 0;
 		current->p->auditdata = NULL; /* TODO: where getting set? */
 	}
 		// memset(current->p, 0, sizeof(struct pf_packet_context));
@@ -2897,7 +2912,7 @@ int pfwall_check(int hook, ...)
 	struct pf_packet_context *p = NULL; /* Details of current "packet" */
 
 	int decision = PF_DROP, rc = 0;
-	int sn; 
+	int sn;
 
 	if (!pfwall_enabled)
 		goto end;
@@ -2905,9 +2920,9 @@ int pfwall_check(int hook, ...)
 		goto end;
 
 	/* for now, only deal with name resolution calls */
-	sn = syscall_get_nr(current, task_pt_regs(current)); 
+	sn = syscall_get_nr(current, task_pt_regs(current));
 	if (!in_set(sn, first_arg_set) && !in_set(sn, second_arg_set))
-		goto end; 
+		goto end;
 
 	/* Ignore the log daemon */
 	if (current->pid == pf_log_daemon_pid)
@@ -2922,7 +2937,7 @@ int pfwall_check(int hook, ...)
 	if (in_atomic()) {
 //		printk(KERN_INFO PFWALL_PFX "in_atomic: %s: %s, %s, %c, %c\n", p->info.binary_path, p->info.scontext, p->info.tcontext, p->info.tclass, p->info.requested);
 		goto end;
-	} 
+	}
 //	if (in_atomic())
 //		goto end;
 
@@ -2930,12 +2945,12 @@ int pfwall_check(int hook, ...)
 	if (current->mm == NULL)
 		goto end;
 
-	/* for paths that already hold mmap_sem, we cannot introspect into userspace, as a page 
+	/* for paths that already hold mmap_sem, we cannot introspect into userspace, as a page
 	 * fault may cause a deadlock (see note arch/x86/mm/fault.c:1092 in do_page_fault) */
 	if (!down_read_trylock(&current->mm->mmap_sem)) {
-		goto end; 
+		goto end;
 	}
-	up_read(&current->mm->mmap_sem); 
+	up_read(&current->mm->mmap_sem);
 
 
 	/* Skip-hook optimization */
