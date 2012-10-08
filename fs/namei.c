@@ -1644,9 +1644,9 @@ static int path_lookupat(int dfd, const char *name,
 static int do_path_lookup(int dfd, const char *name,
 				unsigned int flags, struct nameidata *nd)
 {
-	int retval = path_lookupat(dfd, name, flags | LOOKUP_RCU, nd);
-	if (unlikely(retval == -ECHILD))
-		retval = path_lookupat(dfd, name, flags, nd);
+	// int retval = path_lookupat(dfd, name, flags | LOOKUP_RCU, nd);
+	// if (unlikely(retval == -ECHILD))
+	int	retval = path_lookupat(dfd, name, flags, nd);
 	if (unlikely(retval == -ESTALE))
 		retval = path_lookupat(dfd, name, flags | LOOKUP_REVAL, nd);
 
@@ -2391,8 +2391,8 @@ struct file *do_filp_open(int dfd, const char *pathname,
 	struct nameidata nd;
 	struct file *filp;
 
-	filp = path_openat(dfd, pathname, &nd, op, flags | LOOKUP_RCU);
-	if (unlikely(filp == ERR_PTR(-ECHILD)))
+	// filp = path_openat(dfd, pathname, &nd, op, flags | LOOKUP_RCU);
+	// if (unlikely(filp == ERR_PTR(-ECHILD)))
 		filp = path_openat(dfd, pathname, &nd, op, flags);
 	if (unlikely(filp == ERR_PTR(-ESTALE)))
 		filp = path_openat(dfd, pathname, &nd, op, flags | LOOKUP_REVAL);
