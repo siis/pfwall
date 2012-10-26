@@ -370,25 +370,28 @@ end:
 char *pft_get_process_hierarchy_str(struct task_struct *t)
 {
 	/* 'bash', 'init' */
-	struct task_struct *curr = t; 
+	struct task_struct *curr = t;
 	int c = 0;
 
-	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
+	char *s = (char *) get_zeroed_page(GFP_KERNEL);
 	if (!s)
-		goto out; 
+		goto out;
 
 	while (curr->pid >= 1) { /* we don't want swapper processes */
-		if (strlen(curr->comm) + c + 4 > PAGE_SIZE)
-			break; 
+		if (strlen(curr->comm) + c + 4 > PAGE_SIZE) {
+			free_page((unsigned long) s);
+			s = NULL;
+			goto out;
+		}
 		c += sprintf(s + c, "\"%s\"", curr->comm);
 		if (curr->pid == 1 || curr->parent->pid == 0) /* init process' parent is swapper */
-			break; 
+			break;
 		c += sprintf(s + c, ",");
 		curr = curr->parent;
 	}
 
 out:
-	return s; 
+	return s;
 }
 
 int pft_log_duplicate(char *log_str)
@@ -399,66 +402,72 @@ int pft_log_duplicate(char *log_str)
 char *pft_get_process_stack_str(struct pf_packet_context *p)
 {
 	/* {"entry":"0xbf000000","file":"/lib/ld.so"}, ... */
-	int i = 0, sz, curr = 0; 
+	int i = 0, sz, curr = 0;
 	char entry_str[] = "\"entry\"";
 	char vma_str[] = "\"file\"";
-	char *s = NULL; 
+	char *s = NULL;
 
 	if (!valid_user_stack(&p->user_stack))
-		goto out; 
+		goto out;
 
-	s = (char *) get_zeroed_page(GFP_KERNEL); 	
+	s = (char *) __get_free_pages(GFP_KERNEL, 2);
 	if (!s)
-		goto out; 
+		goto out;
 
 	for (i = 0; i < p->user_stack.trace.nr_entries - 1; i++) {
 		/* overflow check */
-		sz = strlen(p->user_stack.trace.vm_area_strings[i]) + 
-			strlen(entry_str) + strlen(vma_str) + 20; 
-		if (sz + curr > PAGE_SIZE)
-			break; 
-
-		curr += sprintf(s + curr, "{%s:\"0x%lx\",%s:\"%s\"}", entry_str, 
-				us_entry_offset_get(&p->user_stack, i), vma_str, 
-				p->user_stack.trace.vm_area_strings[i]); 
+		sz = strlen(p->user_stack.trace.vm_area_strings[i]) +
+			strlen(entry_str) + strlen(vma_str) + 20;
+		if (sz + curr > PAGE_SIZE * 4) {
+			free_pages((unsigned long) s, 2);
+			s = NULL;
+			goto out;
+		}
+		curr += sprintf(s + curr, "{%s:\"0x%lx\",%s:\"%s\"}", entry_str,
+				us_entry_offset_get(&p->user_stack, i), vma_str,
+				p->user_stack.trace.vm_area_strings[i]);
 
 		if (i != p->user_stack.trace.nr_entries - 2)
-			curr += sprintf(s + curr, ","); 
+			curr += sprintf(s + curr, ",");
 	}
 
+	s[curr] = 0;
 out:
-	return s; 
+	return s;
 }
 
 char *pft_get_interpreter_stack_str(struct pf_packet_context *p)
 {
 	/* {'entry':'4','file':'test.sh'}, ... */
-	int i = 0, sz, curr = 0; 
+	int i = 0, sz, curr = 0;
 	char entry_str[] = "\"entry\"";
 	char vma_str[] = "\"file\"";
+	char *s = NULL;
 
-	char *s = (char *) get_zeroed_page(GFP_KERNEL); 
-	
+	s = (char *) __get_free_pages(GFP_KERNEL, 2);
 	if (!s)
-		goto out; 
+		goto out;
 
 	for (i = 0; i < p->user_stack.int_trace.nr_entries; i++) {
 		/* overflow check */
-		sz = strlen(p->user_stack.int_trace.int_filename[i]) + 
-			strlen(entry_str) + strlen(vma_str) + 20; 
-		if (sz + curr > PAGE_SIZE)
-			break; 
-
-		curr += sprintf(s + curr, "{%s:\"%lu\",%s:\"%s\"}", entry_str, 
+		sz = strlen(p->user_stack.int_trace.int_filename[i]) +
+			strlen(entry_str) + strlen(vma_str) + 20;
+		if (sz + curr > PAGE_SIZE * 4) {
+			free_pages((unsigned long) s, 2);
+			s = NULL;
+			goto out;
+		}
+		curr += sprintf(s + curr, "{%s:\"%lu\",%s:\"%s\"}", entry_str,
 				p->user_stack.int_trace.entries[i], vma_str,
-				p->user_stack.int_trace.int_filename[i]); 
+				p->user_stack.int_trace.int_filename[i]);
 
 		if (i != p->user_stack.int_trace.nr_entries - 1)
-			curr += sprintf(s + curr, ","); 
+			curr += sprintf(s + curr, ",");
 	}
 
+	s[curr] = 0;
 out:
-	return s; 
+	return s;
 }
 
 int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
@@ -476,22 +485,22 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 			(current->thread.sp0 - sizeof (struct pt_regs));
 	int sn = ptregs->ax;
 
-	stack_str = pft_get_process_stack_str(p); 
+	stack_str = pft_get_process_stack_str(p);
 	if (!stack_str)
-		goto end; 
-	interpreter_str = pft_get_interpreter_stack_str(p); 
+		goto end;
+	interpreter_str = pft_get_interpreter_stack_str(p);
 	if (!interpreter_str)
-		goto end; 
+		goto end;
 
-	phier_s = pft_get_process_hierarchy_str(current); 
+	phier_s = pft_get_process_hierarchy_str(current);
 	if (!phier_s)
 		goto end;
 
-	ktime_get_real_ts(&ts); 
+	ktime_get_real_ts(&ts);
 
 	if (lt->context & PF_CONTEXT_SYSCALL_ARGS) {
 		char *str = kmalloc(MAX_LOG_STRLEN, GFP_ATOMIC);
-		log_str = kasprintf(GFP_ATOMIC, "%s: %s", lt->string, 
+		log_str = kasprintf(GFP_ATOMIC, "%s: %s", lt->string,
 				syscall_value_as_string(str, lt->arg_num, lt->offset, lt->type));
 		kfree(str);
 	} else if (lt->context & PF_CONTEXT_FILENAME) {
@@ -514,14 +523,14 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	} else {
 		log_str = kasprintf(GFP_ATOMIC, "\"object\": {\"filename\": \"%s\", \"mac_label\": \"%s\","
 				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%d\", \"syscall_nr\": \"%d(%lu)\","
-				"\"tclass\": \"%d\", \"requested\": \"%u\", \"time\": {\"sec\":\"%ld\", \"nsec\":\"%ld\"}}", 
+				"\"tclass\": \"%d\", \"requested\": \"%u\", \"time\": {\"sec\":\"%ld\", \"nsec\":\"%ld\"}}",
 			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
-			p->info.tcontext, p->info.filename_inoden, 
-			atomic_read(&_syscall_ctr), 
-			sn, (sn == __NR_socketcall) ? ptregs->bx : 0, 
+			p->info.tcontext, p->info.filename_inoden,
+			atomic_read(&_syscall_ctr),
+			sn, (sn == __NR_socketcall) ? ptregs->bx : 0,
 			p->info.tclass, p->info.requested, ts.tv_sec, ts.tv_nsec
-			); 
-			// tclass_str(p->info.tclass), requested_str(p->info.tclass, p->info.requested)); 
+			);
+			// tclass_str(p->info.tclass), requested_str(p->info.tclass, p->info.requested));
 	}
 
 	if (!log_str)
@@ -530,9 +539,9 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	if (!pft_log_duplicate(log_str)) {
 		core_log_str = kasprintf(GFP_ATOMIC, "{\"process\": {\"ancestors\": [%s],"
 				"\"binary\": \"%s\", \"dac_label\": \"0%o\", \"mac_label\": \"%s\", \"pid\": \"%d\","
-				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n", 
-				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid, 
-				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str); 
+				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n",
+				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid,
+				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str);
 		if (!core_log_str)
 			goto end;
 
@@ -543,15 +552,15 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 
 end:
 	if (interpreter_str)
-		free_page((unsigned long) interpreter_str); 
+		free_pages((unsigned long) interpreter_str, 2);
 	if (stack_str)
-		free_page((unsigned long) stack_str); 
+		free_pages((unsigned long) stack_str, 2);
 	if (log_str)
 		kfree(log_str);
 	if (core_log_str)
 		kfree(core_log_str);
 	if (phier_s)
-		free_page((unsigned long) phier_s); 
+		free_page((unsigned long) phier_s);
 
 	return rc;
 }
