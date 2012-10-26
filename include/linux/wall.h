@@ -3,6 +3,7 @@
 #include <asm/syscall.h>
 #include <linux/net.h>
 #include <linux/module.h>
+#include <linux/stat.h>
 
 #define NETLINK_WALL_VIOLATIONS 28
 
@@ -66,7 +67,7 @@
 #define PFWALL_MATCH_REPR
 
 /* Advanced stacktrace - Remember to change paths of libraries */
-// #define PFWALL_ADVANCED_STACKTRACE
+#define PFWALL_ADVANCED_STACKTRACE
 
 #define PFW_UBUNTU_10_04_LIBC_PATH "/lib/tls/i686/cmov/libc-2.11.1.so"
 #define PFW_UBUNTU_10_04_LD_SO_PATH "/lib/ld-2.11.1.so"
@@ -83,7 +84,7 @@
 #define PFWALL_SID_SYSLOW -3
 
 /* Maximum number of frames in the userspace backtrace */
-#define MAX_NUM_FRAMES 32
+#define MAX_NUM_FRAMES 64
 #define MAX_INT_LOG 1024
 
 /* Signal queue where the signal is dequeued from, so we get
@@ -345,6 +346,12 @@ struct pf_packet_context {
 	/* UID of user that can attack filename resource
 		syscall_filename */
 	uid_t sys_fname_attacker_uid;
+
+	/* struct stat of object */
+	struct stat stat_res;
+
+	/* struct stat of target of symlink */
+	struct stat stat_tgt;
 };
 
 extern struct kmem_cache *pf_packet_context_cachep;
