@@ -42,6 +42,7 @@
 #define PF_CONTEXT_SIGINFO 0x800 /* Signal information */
 #define PF_CONTEXT_SYSCALL_FILENAME 0x1000 /* Filename from syscall args */
 #define PF_CONTEXT_DAC_BINDERS 0x2000 /* Possible attacker UID */
+#define PF_CONTEXT_RESOURCE 0x4000 /* struct stat of the resource or binding */
 
 /* Hooks */
 #define PF_NR_HOOKS 7 /* input, output, data read, inode create */
@@ -348,10 +349,10 @@ struct pf_packet_context {
 	uid_t sys_fname_attacker_uid;
 
 	/* struct stat of object */
-	struct stat stat_res;
+	struct stat64 stat_res;
 
 	/* struct stat of target of symlink */
-	struct stat stat_tgt;
+	struct stat64 stat_tgt;
 };
 
 extern struct kmem_cache *pf_packet_context_cachep;
