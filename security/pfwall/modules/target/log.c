@@ -290,10 +290,22 @@ int pft_auditdata_context(struct pf_packet_context *p)
 			;
 		}
 	}
+
+	p->stat_res.st_ino = 0;
+	p->stat_res.st_uid = 0;
+	p->stat_res.st_gid = 0;
+	p->stat_res.st_mode = 0;
+	p->stat_res.st_nlink = 0;
 	if (dentry) {
 		strcpy(p->info.filename, dentry->d_name.name);
-		if (dentry->d_inode) /* inode may not have been created yet */
+		if (dentry->d_inode) { /* inode may not have been created yet */
 			p->info.filename_inoden = dentry->d_inode->i_ino;
+			p->stat_res.st_ino = dentry->d_inode->i_ino;
+			p->stat_res.st_uid = dentry->d_inode->i_uid;
+			p->stat_res.st_gid = dentry->d_inode->i_gid;
+			p->stat_res.st_mode = dentry->d_inode->i_mode;
+			p->stat_res.st_nlink = dentry->d_inode->i_nlink;
+		}
 		if (a->type == LSM_AUDIT_DATA_PATH ||
 			a->type == LSM_AUDIT_DATA_INODE)
 			dput(dentry);
@@ -498,6 +510,7 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 
 	ktime_get_real_ts(&ts);
 
+	/* TODO: make everything json */
 	if (lt->context & PF_CONTEXT_SYSCALL_ARGS) {
 		char *str = kmalloc(MAX_LOG_STRLEN, GFP_ATOMIC);
 		log_str = kasprintf(GFP_ATOMIC, "%s: %s", lt->string,
@@ -522,10 +535,13 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 		log_str = kasprintf(GFP_ATOMIC, "%s", p->syscall_filename);
 	} else {
 		log_str = kasprintf(GFP_ATOMIC, "\"object\": {\"filename\": \"%s\", \"mac_label\": \"%s\","
-				"\"st_ino\": \"%lu\"}, \"operation\": {\"counter\": \"%d\", \"syscall_nr\": \"%d(%lu)\","
+				"\"dac_label\": {\"st_uid\": \"%lu\",\"st_gid\":\"%lu\",\"st_mode\":\"0%o\"},"
+				"\"st_nlink\": \"%u\", \"st_ino\": \"%lu\"}, "
+				"\"operation\": {\"counter\": \"%d\", \"syscall_nr\": \"%d(%lu)\","
 				"\"tclass\": \"%d\", \"requested\": \"%u\", \"time\": {\"sec\":\"%ld\", \"nsec\":\"%ld\"}}",
 			(strlen(p->info.filename) != 0) ? p->info.filename : "none",
-			p->info.tcontext, p->info.filename_inoden,
+			p->info.tcontext, p->stat_res.st_uid, p->stat_res.st_gid, p->stat_res.st_mode,
+			p->stat_res.st_nlink, p->info.filename_inoden,
 			atomic_read(&_syscall_ctr),
 			sn, (sn == __NR_socketcall) ? ptregs->bx : 0,
 			p->info.tclass, p->info.requested, ts.tv_sec, ts.tv_nsec
@@ -538,7 +554,7 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 
 	if (!pft_log_duplicate(log_str)) {
 		core_log_str = kasprintf(GFP_ATOMIC, "{\"process\": {\"ancestors\": [%s],"
-				"\"binary\": \"%s\", \"dac_label\": \"0%o\", \"mac_label\": \"%s\", \"pid\": \"%d\","
+				"\"binary\": \"%s\", \"dac_label\": \"%u\", \"mac_label\": \"%s\", \"pid\": \"%d\","
 				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n",
 				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid,
 				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str);

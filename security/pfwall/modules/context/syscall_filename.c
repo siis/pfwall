@@ -109,6 +109,7 @@ int pft_syscall_filename_context(struct pf_packet_context *p)
 		}
 	}
 
+	p->context |= PF_CONTEXT_SYSCALL_FILENAME;
 out_free:
 	if (sock)
 		kfree(sock);
