@@ -20,6 +20,8 @@
 #include <linux/namei.h>
 #include <linux/stacktrace.h>
 #include <linux/module.h>
+#include <linux/log2.h>
+
 #include <asm/stacktrace.h>
 
 #include <trace/events/sched.h>
@@ -616,7 +618,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	if (!pfwall_lazy_context_evaluation_enabled) {
 		/* Calculate all context beforehand */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
+			ret = pf_context_array[ilog2(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -624,12 +626,12 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 		}
 		#ifdef PFWALL_MATCH_STR
 		if (!(p->context & PF_CONTEXT_BINARY_PATH)) {
-			pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p);
+			pf_context_array[ilog2(PF_CONTEXT_BINARY_PATH)](p);
 		}
 		#endif
 		#ifdef PFWALL_MATCH_REPR
 		if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-			pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p);
+			pf_context_array[ilog2(PF_CONTEXT_BINARY_PATH_INODE)](p);
 		}
 		#endif
 	}
@@ -661,7 +663,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	/* Match binary path */
 	#ifdef PFWALL_MATCH_STR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH)) {
-		pf_context_array[log(PF_CONTEXT_BINARY_PATH)](p);
+		pf_context_array[ilog2(PF_CONTEXT_BINARY_PATH)](p);
 	}
 	if (!(!strcmp(def->binary_path, "") ||
 		!strcmp(def->binary_path, p->info.binary_path)))
@@ -669,7 +671,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 	#endif
 	#ifdef PFWALL_MATCH_REPR
 	if (!(p->context & PF_CONTEXT_BINARY_PATH_INODE)) {
-		pf_context_array[log(PF_CONTEXT_BINARY_PATH_INODE)](p);
+		pf_context_array[ilog2(PF_CONTEXT_BINARY_PATH_INODE)](p);
 	}
 	if (!(def->binary_inoden == 0 || def->binary_inoden == p->info.binary_inoden))
 	#endif
@@ -750,7 +752,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 
 		/* We have to get the context of the interface */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
+			ret = pf_context_array[ilog2(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -787,7 +789,7 @@ int pft_default_ctxt_and_match(struct pf_packet_context *p, void *match_specific
 
 		/* We have to get the context of the interface */
 		if (!(p->context & PF_CONTEXT_INTERFACE)) {
-			ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
+			ret = pf_context_array[ilog2(PF_CONTEXT_INTERFACE)](p);
 			if (ret < 0) {
 				/* Error gathering interface, return packet not matched */
 				return 0;
@@ -2264,7 +2266,7 @@ int update_match_context(struct pft_match *m, struct pf_packet_context *p)
 		if (((m->context_mask) & (m->context_mask - 1)) == 0) {
 			/* m->context_mask is the only bit set */
 			if (!(m->context_mask & (p->context))) {
-				ret = pf_context_array[log(m->context_mask)](p);
+				ret = pf_context_array[ilog2(m->context_mask)](p);
 				if (ret < 0)
 					goto end;
 			}
@@ -2292,7 +2294,7 @@ int update_target_context(struct pft_target *t, struct pf_packet_context *p)
 		if (((t->context_mask) & (t->context_mask - 1)) == 0) {
 			/* Only one context bit set */
 			if (!(t->context_mask & p->context)) {
-				ret = pf_context_array[log(t->context_mask)](p);
+				ret = pf_context_array[ilog2(t->context_mask)](p);
 				if (ret < 0)
 					goto end;
 				t->context_mask |= p->context;
@@ -2485,7 +2487,7 @@ int pft_do_filter(int hook, struct pf_packet_context *p)
 		select chains for each interface on the
 		backtrace */
 	if (!(p->context & PF_CONTEXT_INTERFACE)) {
-		ret = pf_context_array[log(PF_CONTEXT_INTERFACE)](p);
+		ret = pf_context_array[ilog2(PF_CONTEXT_INTERFACE)](p);
 		if (ret < 0) {
 			verdict = PF_ACCEPT;
 			goto end;
@@ -2912,17 +2914,18 @@ int pfwall_check(int hook, ...)
 	struct pf_packet_context *p = NULL; /* Details of current "packet" */
 
 	int decision = PF_DROP, rc = 0;
-	int sn;
 
 	if (!pfwall_enabled)
 		goto end;
 	if (current->kernel_request > 0)
 		goto end;
 
+	#if 0
 	/* for now, only deal with name resolution calls */
 	sn = syscall_get_nr(current, task_pt_regs(current));
 	if (!in_set(sn, first_arg_set) && !in_set(sn, second_arg_set))
 		goto end;
+	#endif
 
 	/* Ignore the log daemon */
 	if (current->pid == pf_log_daemon_pid)
@@ -2952,6 +2955,14 @@ int pfwall_check(int hook, ...)
 	}
 	up_read(&current->mm->mmap_sem);
 
+	/* only invoke process firewall on resource access system calls */
+	/*
+	if (syscall_get_nr(current, task_pt_regs(current)) != __NR_open)
+		goto end;
+	*/
+	if (!(in_set(syscall_get_nr(current, task_pt_regs(current)), first_arg_set) ||
+		in_set(syscall_get_nr(current, task_pt_regs(current)), second_arg_set)))
+		goto end;
 
 	/* Skip-hook optimization */
 	if (pfwall_skip_hook_enabled)
