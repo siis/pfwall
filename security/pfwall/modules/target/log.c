@@ -482,13 +482,131 @@ out:
 	return s;
 }
 
+char *pft_get_process_argv_str(struct task_struct *p)
+{
+	/* "/usr/bin/perl", "test.pl" */
+	int sz, tc = 0, sc = 0, l;
+	char *s = NULL, *t = NULL;
+	int ret = 0;
+	struct mm_struct *mm = get_task_mm(p);
+
+	t = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!t)
+		goto out;
+
+	s = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!s)
+		goto out;
+
+	sz = mm->arg_end - mm->arg_start;
+
+	if (sz > PAGE_SIZE)
+		sz = PAGE_SIZE;
+
+	ret = copy_from_user(t, mm->arg_start, sz);
+	if (ret)
+		goto out;
+
+	/* non-null terminated */
+	if (t[sz - 1] != '\0')
+		goto out;
+
+	/* replace quote */
+	for (l = 0; t[l]; l++)
+		if (t[l] == '"')
+			t[l] = '\'';
+
+	while (1) {
+		l = strlen(t + tc);
+
+		/* will the current string + quotes + comma fit? */
+		if (sc + l > PAGE_SIZE - 4)
+			break;
+
+		sc += sprintf(s + sc, "\"%s\"", t + tc);
+		tc += l + 1; /* jump over '\0' */
+
+		if (tc == sz)
+			break;
+
+		sc += sprintf(s + sc, ",");
+	}
+
+	s[sc] = 0;
+
+out:
+	if (t)
+		free_page((unsigned long) t);
+	return s;
+}
+
+char *pft_get_process_envp_str(struct task_struct *p)
+{
+	/* "/usr/bin/perl", "test.pl" */
+	int sz, tc = 0, sc = 0, l;
+	char *s = NULL, *t = NULL;
+	int ret = 0;
+	struct mm_struct *mm = get_task_mm(p);
+
+	t = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!t)
+		goto out;
+
+	s = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!s)
+		goto out;
+
+	sz = mm->env_end - mm->env_start;
+
+	if (sz > PAGE_SIZE)
+		sz = PAGE_SIZE;
+
+	ret = copy_from_user(t, mm->env_start, sz);
+	if (ret)
+		goto out;
+
+	/* non-null terminated */
+	if (t[sz - 1] != '\0')
+		goto out;
+
+	/* replace quote */
+	for (l = 0; t[l]; l++)
+		if (t[l] == '"')
+			t[l] = '\'';
+
+	while (1) {
+		l = strlen(t + tc);
+
+		/* will the current string + quotes + comma fit? */
+		if (sc + l > PAGE_SIZE - 4)
+			break;
+
+		sc += sprintf(s + sc, "\"%s\"", t + tc);
+		tc += l + 1; /* jump over '\0' */
+
+		if (tc == sz)
+			break;
+
+		sc += sprintf(s + sc, ",");
+	}
+
+	s[sc] = 0;
+
+out:
+	if (t)
+		free_page((unsigned long) t);
+	return s;
+}
+
 int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 {
 	char *interpreter_str = NULL; /* String for interpreter backtrace */
 	char *stack_str = NULL; /* String for stack backtrace */
 	char *core_log_str = NULL; /* String to check for duplication */
 	char *log_str = NULL;
-	char *phier_s = NULL; /* process heirarchy string */
+	char *phier_str = NULL; /* process heirarchy string */
+	char *argv_str = NULL; /* process argv string */
+	char *envp_str = NULL; /* process envp string */
 	struct timespec ts; /* real wall clock time */
 
 	int rc = 0;
@@ -504,8 +622,16 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	if (!interpreter_str)
 		goto end;
 
-	phier_s = pft_get_process_hierarchy_str(current);
-	if (!phier_s)
+	phier_str = pft_get_process_hierarchy_str(current);
+	if (!phier_str)
+		goto end;
+
+	argv_str = pft_get_process_argv_str(current);
+	if (!argv_str)
+		goto end;
+
+	envp_str = pft_get_process_envp_str(current);
+	if (!envp_str)
 		goto end;
 
 	ktime_get_real_ts(&ts);
@@ -555,9 +681,11 @@ int pft_log(struct pf_packet_context *p, struct pft_target_log *lt)
 	if (!pft_log_duplicate(log_str)) {
 		core_log_str = kasprintf(GFP_ATOMIC, "{\"process\": {\"ancestors\": [%s],"
 				"\"binary\": \"%s\", \"dac_label\": \"%u\", \"mac_label\": \"%s\", \"pid\": \"%d\","
-				"\"entrypoint_index\": \"%d\", \"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n",
-				phier_s, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid,
-				p->user_stack.trace.ept_ind, stack_str, interpreter_str, log_str);
+				"\"entrypoint_index\": \"%d\", \"argv\": [%s], \"envp\": [%s], "
+				"\"process_stack\": [%s], \"script_stack\": [%s]}, %s},\n",
+				phier_str, p->info.binary_path, current->cred->fsuid, p->info.scontext, p->info.pid,
+				p->user_stack.trace.ept_ind, argv_str, envp_str,
+				stack_str, interpreter_str, log_str);
 		if (!core_log_str)
 			goto end;
 
@@ -575,8 +703,12 @@ end:
 		kfree(log_str);
 	if (core_log_str)
 		kfree(core_log_str);
-	if (phier_s)
-		free_page((unsigned long) phier_s);
+	if (phier_str)
+		free_page((unsigned long) phier_str);
+	if (argv_str)
+		free_page((unsigned long) argv_str);
+	if (envp_str)
+		free_page((unsigned long) envp_str);
 
 	return rc;
 }
