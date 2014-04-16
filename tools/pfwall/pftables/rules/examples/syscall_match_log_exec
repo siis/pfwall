@@ -1,0 +1,2 @@
+pftables -t filter -I input -m syscall -a 0 -o 0 -t int -c 11 -e -j log 
+pftables -t filter -I output -m syscall -a 0 -o 0 -t int -c 11 -e -j log 

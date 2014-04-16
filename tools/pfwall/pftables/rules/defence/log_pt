@@ -1,0 +1,72 @@
+# If receiving a message, assuming start of serving request and record. 
+pftables -t filter -I input -c 14 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 14 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 14 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 16 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 16 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 16 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 17 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 17 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 17 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 20 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 20 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 20 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 21 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 21 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 21 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 22 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 22 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 22 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 23 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 23 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 23 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 24 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 24 -o 131072 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 24 -o 524288 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I input -c 26 -o 2 -s SYSHIGH -j state_target -s -k log -v 1
+# Record file operations when in proper state
+pftables -t filter -I input -c 6 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 6 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 9 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 9 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 10 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 10 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 11 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 11 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 12 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 12 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 13 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 13 -m state_match -k log -c 1 -e -j log
+# pftables -t filter -I syscallbegin -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 1 -o 0 -t string -s filename_in_syscall
+# When sending a message, assume end of transaction with client, unset state. 
+pftables -t filter -I output -c 14 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 14 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 14 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 15 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 15 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 15 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 16 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 16 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 16 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 17 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 17 -o 4 -s SYSHIGH -j state_target -s -k log -v 1
+pftables -t filter -I output -c 17 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 20 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 20 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 20 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 21 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 21 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 21 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 22 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 22 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 22 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 23 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 23 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 23 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 24 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 24 -o 262144 -s SYSHIGH -j state_target -r -k log
+pftables -t filter -I output -c 24 -o 1048576 -s SYSHIGH -j state_target -s -k log
+pftables -t filter -I output -c 26 -o 1 -s SYSHIGH -j state_target -s -k log

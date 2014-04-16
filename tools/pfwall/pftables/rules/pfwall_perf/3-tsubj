@@ -1,0 +1,5 @@
+pftables -t filter -I input -b /root/a.out -s SYSHIGH -j accept
+# pftables -t filter -I input -b /root/a.out -s sysadm_t -d user_home_t -j accept
+# pftables -t filter -I output -b /root/a.out -s sysadm_t -d user_home_t -j log
+# pftables -t filter -I input -b /root/a.out -j log
+# pftables -t filter -I output -b /root/a.out -s sysadm_t -d user_home_t -j log

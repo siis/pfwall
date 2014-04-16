@@ -1,0 +1,18 @@
+pftables -t filter -I input -c 6 -j library_chain
+pftables -t filter -I library_chain -j log 
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -d lib_t -j accept
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -d textrel_shlib_t -j accept
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -j log
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -j accept
+pftables -t filter -I syscallbegin -v  /root/bin/sh   -i  0x2915e  -j state_target -s -k  0x6d039  -v 0
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  6  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  7  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  10  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  11  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  12  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  13  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -m state_match -u -k  0x6d039  -j accept
+pftables -t filter -I output -v  /root/bin/sh   -i  0x6d039  -m state_match -u -k  0x6d039  -j accept
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c  6  -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -n -j accept
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c  7  -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -n -j accept
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c 13 -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -e -j state_target -r -k  0x6d039  -a

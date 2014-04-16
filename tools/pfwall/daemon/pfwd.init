@@ -1,0 +1,32 @@
+#!/bin/bash
+# This starts the logging daemon for the process firewall
+
+. /lib/lsb/init-functions 
+
+prog=/usr/bin/pfwd
+case "$1" in
+	start)
+		mount -t debugfs none /sys/kernel/debug
+		log_daemon_msg "Starting $prog: "
+		if start-stop-daemon --start --pidfile /var/run/pfwd.pid --exec /usr/bin/nohup -- $prog /var/log/pfw.log &
+		then 
+			log_end_msg 0
+		else
+			log_end_msg 1
+		fi 
+		;;
+	stop)
+		log_daemon_msg "Stopping $prog: "
+		echo -1 > /sys/kernel/debug/pft_log_daemon_pid
+		killall -9 pfwd
+#		if start-stop-daemon --stop --pidfile /var/run/pfwd.pid
+#		then 
+#			log_end_msg 0
+#		else
+#			log_end_msg 1
+#		fi 
+		;;
+	*)
+		echo "Usage: $0 {start|stop}"
+		exit 1
+esac

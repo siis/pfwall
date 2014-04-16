@@ -1,0 +1,14 @@
+# Skip programs which do things correctly 
+pftables -t filter -I syscallbegin -b /usr/sbin/postdrop -j accept
+pftables -t filter -I syscallbegin -b /bin/tempfile -j accept
+pftables -t filter -I syscallbegin -b /usr/bin/landscape-package-reporter -j accept
+# Fuzz resource as symlink and mark
+pftables -t filter -I syscallbegin -j fuzz_resource -f SYMLINK -c
+# If this system call accesses a marked object, set state to log all accesses 
+pftables -t filter -I input -m attacker_marked -j state_target -s -k log -v 1
+pftables -t filter -I output -m attacker_marked -j state_target -s -k log -v 1
+# Log all accesses if set (excluding stat()/open() family of calls that are used for checking)
+pftables -t filter -I input -m syscall -a 0 -t int -c 301 -n -m syscall -a 0 -t int -c 230 -n -m syscall -a 0 -t int -c 33 -n -m syscall -a 0 -t int -c 10 -n -m syscall -a 0 -t int -c 85 -n -m syscall -a 0 -t int -c 229 -n -m syscall -a 0 -t int -c 231 -n -m syscall -a 0 -t int -c 232 -n -m syscall -a 0 -t int -c 233 -n -m syscall -a 0 -t int -c 234 -n -m syscall -a 0 -t int -c 301 -n -m syscall -a 0 -o 0 -t int -c 106 -n -m syscall -a 0 -o 0 -t int -c 107 -n -m syscall -a 0 -o 0 -t int -c 108 -n -m syscall -a 0 -o 0 -t int -c 195 -n -m syscall -a 0 -o 0 -t int -c 196 -n -m syscall -a 0 -o 0 -t int -c 197 -n -m syscall -a 0 -o 0 -t int -c 300 -n -m syscall -a 0 -o 0 -t int -c 295 -n -m syscall -a 0 -o 0 -t int -c 5 -n -m state_match -k log -c 1 -j log
+pftables -t filter -I output -m syscall -a 0 -t int -c 301 -n -m syscall -a 0 -t int -c 230 -n -m syscall -a 0 -t int -c 33 -n -m syscall -a 0 -t int -c 10 -n -m syscall -a 0 -t int -c 85 -n -m syscall -a 0 -t int -c 229 -n -m syscall -a 0 -t int -c 231 -n -m syscall -a 0 -t int -c 232 -n -m syscall -a 0 -t int -c 233 -n -m syscall -a 0 -t int -c 234 -n -m syscall -a 0 -t int -c 301 -n -m syscall -a 0 -o 0 -t int -c 106 -n -m syscall -a 0 -o 0 -t int -c 107 -n -m syscall -a 0 -o 0 -t int -c 108 -n -m syscall -a 0 -o 0 -t int -c 195 -n -m syscall -a 0 -o 0 -t int -c 196 -n -m syscall -a 0 -o 0 -t int -c 197 -n -m syscall -a 0 -o 0 -t int -c 300 -n -m syscall -a 0 -o 0 -t int -c 295 -n -m syscall -a 0 -o 0 -t int -c 5 -n -m state_match -k log -c 1 -j log
+# Unset state
+pftables -t filter -I syscallend -j state_target -s -k log -v 0 

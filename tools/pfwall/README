@@ -1,0 +1,10 @@
+this directory contains userspace setup and tools for the Process Firewall. 
+
+To setup the filesystem:
+	$ make install
+
+this installs the process firewall daemon (pfwd) that generates the log file at /var/log/pfw.log
+
+To push rules into the kernel:
+	$ pftables/pftables.py -h # for usage and an example
+	$ ./pftables.py -i rules/examples/log # file containing rules to log everything

@@ -1,0 +1,10 @@
+# Fuzz resource as symlink and mark
+pftables -t filter -I syscallbegin -b /bin/touch -j fuzz_resource -f SYMLINK
+# If this system call accesses a marked object, set state to log all accesses 
+pftables -t filter -I input -b /bin/echo -m attacker_marked -j state_target -s -k log -v 1
+pftables -t filter -I output -b /bin/echo -m attacker_marked -j state_target -s -k log -v 1
+# Log all accesses if set (excluding stat()/open() family of calls that are used for checking)
+pftables -t filter -I input -b /bin/echo -m state_match -k log -c 1 -j log
+pftables -t filter -I output -b /bin/echo -m state_match -k log -c 1 -j log
+# Unset state
+pftables -t filter -I syscallend -b /bin/echo -j state_target -s -k log -v 0 

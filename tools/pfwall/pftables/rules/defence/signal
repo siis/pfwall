@@ -1,0 +1,4 @@
+pftables -t filter -I signaldelivery -m signal_match -m state_match -k sig -c 1 -j drop
+pftables -t filter -I signaldelivery -m signal_match -j state_target -s -k sig -v 1 -a
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 119 -e -j state_target -s -k sig -v 0 -a 
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 173 -e -j state_target -s -k sig -v 0 -a 

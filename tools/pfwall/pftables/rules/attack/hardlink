@@ -1,0 +1,10 @@
+# Fuzz resource as symlink and mark
+pftables -t filter -I syscallbegin -m permission -p ATTACKER_BIND  -j fuzz_resource -f HARDLINK
+
+# Log all accesses (in theory, we should not log open() or stat() because they just check the resource, but let's do that also. It means that the log file will have some spurious entries, but we can just ignore open() and stat() anyway. 
+pftables -t filter -I input -m attacker_marked -j log
+pftables -t filter -I output -m attacker_marked -j log
+
+# Augment with untrusted search path
+# If a process is to be launched, change CWD to attacker home dir
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 11 -e -j cwd

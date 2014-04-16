@@ -1,0 +1,2 @@
+pftables -t filter -I input -j accept
+pftables -t filter -I output -j accept

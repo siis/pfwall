@@ -1,0 +1,2 @@
+1. Do NOT use contexts in hooks where the context is not available yet.
+2. The syscall return hook will have ptregs->ax set to return value, not syscall number. 

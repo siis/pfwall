@@ -1,0 +1,89 @@
+#!/bin/sh
+
+if [ $# -ne 2 ]
+then
+	echo "$0 [debug_dir] [interpreter=(bash|php5)]"
+	exit 1
+fi
+
+INTERPRETER_PATH="$(which $2)"
+DBG_FILE="$1/$INTERPRETER_PATH"
+INSTALL_DIR="/etc/pfwall"
+INTERPRETER_INFO_FILE="$INSTALL_DIR/interpreter_info"
+
+install_dbgsym ()
+{
+	echo "deb http://ddebs.ubuntu.com $(lsb_release -cs) main restricted universe multiverse" | \
+	tee -a /etc/apt/sources.list.d/ddebs.list
+
+	echo "deb http://ddebs.ubuntu.com $(lsb_release -cs)-updates main restricted universe multiverse
+	deb http://ddebs.ubuntu.com $(lsb_release -cs)-security main restricted universe multiverse
+	deb http://ddebs.ubuntu.com $(lsb_release -cs)-proposed main restricted universe multiverse" | \
+	tee -a /etc/apt/sources.list.d/ddebs.list
+
+	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 428D7C01
+	apt-get update
+	apt-get install -y bash-dbgsym
+
+	apt-get install -y php5-dbg
+}
+
+get_addr () 
+{
+
+	abs="0x"$(objdump -t $DBG_FILE | grep " $1$" | awk '{ print $1 }')
+	base=$(objdump -p $DBG_FILE | grep -B1 "r-x" | grep LOAD | awk '{print $5 }')
+
+	printf "%x" $(($abs - $base))
+}
+
+get_size ()
+{
+	objdump -t $DBG_FILE | grep " $1$" | awk '{ print $5 }'
+}
+
+install -d -m 755 $INSTALL_DIR
+if [ ! -f $INTERPRETER_INFO_FILE ]
+then
+	touch $INTERPRETER_INFO_FILE
+fi
+
+if [ ! -f $DBG_FILE ]
+then
+	install_dbgsym
+fi
+
+if [ "$2" = "bash" ]
+then
+	sed -i '/bash/d' $INTERPRETER_INFO_FILE
+
+	printf "bash:%s:0x%s:0x%s:" \
+			"$(stat -c%i $INTERPRETER_PATH)" \
+			"$(get_addr execute_command)" \
+			"$(get_size execute_command)" \
+				>> $INTERPRETER_INFO_FILE
+
+	printf "7:g:0x%s:g:0x%s:g:0x%s:g:0x%s:g:0x%s:g:0x%s:g:0x%s\n" \
+			"$(get_addr shell_variables)" \
+			"$(get_addr currently_executing_command)" \
+			"$(get_addr executing)" \
+			"$(get_addr showing_function_line)" \
+			"$(get_addr variable_context)" \
+			"$(get_addr interactive_shell)" \
+			"$(get_addr line_number)" \
+				>> $INTERPRETER_INFO_FILE
+
+elif [ "$2" = "php5" ]
+then
+	sed -i '/php5/d' $INTERPRETER_INFO_FILE
+
+	printf "php5:%s:0x%s:0x%s:" \
+			"$(stat -c%i $INTERPRETER_PATH)" \
+			"$(get_addr execute)" \
+			"$(get_size execute)" \
+				>> $INTERPRETER_INFO_FILE
+
+	printf "1:g:0x%s\n" \
+			"$(get_addr executor_globals)" \
+				>> $INTERPRETER_INFO_FILE
+fi

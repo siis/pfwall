@@ -1,0 +1,24 @@
+pftables -t filter -I signaldelivery -m signal_match -m state_match -k sig -c 1 -j drop
+pftables -t filter -I signaldelivery -m signal_match -j state_target -s -k sig -v 1 -a
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 119 -e -j state_target -s -k sig -v 0 -a 
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 173 -e -j state_target -s -k sig -v 0 -a 
+pftables -t filter -I input -c 6 -j library_chain
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -d lib_t -j accept
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -d textrel_shlib_t -j accept
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -j log
+pftables -t filter -I library_chain -v /root/lib/ld-2.11.1.so -c 6 -i 0x7064 -j drop
+pftables -t filter -I syscallbegin -v  /root/bin/sh   -i  0x2915e  -j state_target -s -k  0x6d039  -v 0
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  6  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  7  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  10  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  11  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  12  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x2915e  -c  13  -o 16 -j state_target -s -k  0x6d039   -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -m state_match -u -k  0x6d039  -j accept
+pftables -t filter -I output -v  /root/bin/sh   -i  0x6d039  -m state_match -u -k  0x6d039  -j accept
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c  6  -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -n -j drop
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c  7  -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -n -j drop
+pftables -t filter -I input -v  /root/bin/sh   -i  0x6d039  -c 13 -o 16 -m state_match -k  0x6d039  -c PF_CONTEXT_FILENAME -e -j state_target -r -k  0x6d039  -a
+pftables -t filter -I input -m syscall -a 0 -o 0 -t int -c 5 -j state_target -k link -v 1
+pftables -t filter -I create -m state_match -u -k link -j state -s -k link -v PF_CONTEXT_FILENAME
+pftables -t filter -I input -c 6 -o 1048576 -m state_match -k link -c 1 -e -j accept

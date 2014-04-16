@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+	echo "$0 [log_file]"
+	exit 1
+fi
+
+echo 0 > /sys/kernel/debug/pfwall_enabled
+cat /sys/kernel/debug/wall_interfaces* > $1
+echo 1 > /sys/kernel/debug/pfwall_enabled

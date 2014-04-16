@@ -1,0 +1,1 @@
+pftables -t filter -I syscallbegin -m permission -p ATTACKER_BIND -j log -c PF_CONTEXT_SYSCALL_FILENAME

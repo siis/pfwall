@@ -1,0 +1,28 @@
+# for exec calls, we have to print the filename at the beginning, as the registers will reset later. 
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 11 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 1 -o 0 -t string -s filename_in_syscall
+# If we have dir search, set state to log
+pftables -t filter -I input -c 7 -o 1048576 -j state_target -s -k log -v 1
+# If state is log, log the second arg for *at() family. 
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 295 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 296 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 297 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 298 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 299 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 300 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 301 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 302 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 303 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 304 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 305 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 306 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 307 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 292 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 320 -e -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 2 -o 0 -t string -s filename_in_syscall
+# If not *at() family and not exec and not inode_add_watch (292), and not fchdir, socketcall (which both do dir search but are exceptions), log 1st arg as filename
+pftables -t filter -I syscallend -m syscall -a 0 -o 0 -t int -c 292 -n -m syscall -a 0 -o 0 -t int -c 133 -n -m syscall -a 0 -o 0 -t int -c 102 -n -m syscall -a 0 -o 0 -t int -c 11 -n -m syscall -a 0 -o 0 -t int -c 295 -n -m syscall -a 0 -o 0 -t int -c 296 -n -m syscall -a 0 -o 0 -t int -c 297 -n -m syscall -a 0 -o 0 -t int -c 298 -n -m syscall -a 0 -o 0 -t int -c 299 -n -m syscall -a 0 -o 0 -t int -c 300 -n -m syscall -a 0 -o 0 -t int -c 301 -n -m syscall -a 0 -o 0 -t int -c 302 -n -m syscall -a 0 -o 0 -t int -c 303 -n -m syscall -a 0 -o 0 -t int -c 304 -n -m syscall -a 0 -o 0 -t int -c 305 -n -m syscall -a 0 -o 0 -t int -c 306 -n -m syscall -a 0 -o 0 -t int -c 307 -n -m syscall -a 0 -o 0 -t int -c 320 -n -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 1 -o 0 -t string -s filename_in_syscall
+# Log the system call number 
+pftables -t filter -I syscallend -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 0 -o 0 -t int -s syscall_number
+# Reset logging state at end of system call
+pftables -t filter -I syscallend -j state_target -r -k log
+# Log dir search operations (for dir_inode)
+pftables -t filter -I input -c 7 -o 1048576 -j log

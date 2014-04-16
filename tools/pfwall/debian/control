@@ -1,0 +1,13 @@
+Source: sting-user
+Maintainer: Hayawardh Vijayakumar <hvijay@cse.psu.edu>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.3
+Build-Depends: debhelper (>= 8)
+
+Package: sting-user
+Architecture: any
+Depends: python-pyxattr, selinux, initramfs-tools, binutils, bash-dbgsym, php5-dbg, ${misc:Depends}
+Description: Userspace tools for STING, including initramfs scripts
+ This package provides userspace utilities for STING, 
+ initramfs scripts. 

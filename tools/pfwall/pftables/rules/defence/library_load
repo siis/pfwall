@@ -1,0 +1,5 @@
+pftables -t filter -I input -c 6 -j library_chain
+pftables -t filter -I library_chain -v /lib/ld-2.11.1.so -c 6 -i 0x7064 -d lib_t -j accept
+pftables -t filter -I library_chain -v /lib/ld-2.11.1.so -c 6 -i 0x7064 -d textrel_shlib_t -j accept
+pftables -t filter -I library_chain -v /lib/ld-2.11.1.so -c 6 -i 0x7064 -j log
+pftables -t filter -I library_chain -v /lib/ld-2.11.1.so -c 6 -i 0x7064 -j drop

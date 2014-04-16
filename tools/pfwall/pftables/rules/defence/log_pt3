@@ -1,0 +1,23 @@
+# If receiving a message, assuming start of serving request and record. 
+pftables -t filter -I input -o 2 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j log
+pftables -t filter -I output -o 2 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j log
+pftables -t filter -I input -c 14 -o 2 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 14 -o 2 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 14 -o 131072 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 14 -o 524288 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 2 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 131072 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+pftables -t filter -I input -c 15 -o 524288 -b /usr/local/src/php/php-5.3.6/sapi/cli/php -v /usr/local/src/php/php-5.3.6/sapi/cli/php -j state_target -s -k log -v 1
+# Record file operations when in proper state
+pftables -t filter -I input -c 6 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 6 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I input -c 9 -m state_match -k log -c 1 -e -j log
+pftables -t filter -I output -c 9 -m state_match -k log -c 1 -e -j log
+# pftables -t filter -I syscallbegin -m state_match -k log -c 1 -e -j log -c PF_CONTEXT_SYSCALL_ARGS -a 1 -o 0 -t string -s filename_in_syscall
+# When sending a message, assume end of transaction with client, unset state. 
+pftables -t filter -I output -c 14 -o 4  -j state_target -r -k log
+pftables -t filter -I output -c 14 -o 262144  -j state_target -r -k log
+pftables -t filter -I output -c 14 -o 1048576  -j state_target -r -k log
+pftables -t filter -I output -c 15 -o 4  -j state_target -r -k log
+pftables -t filter -I output -c 15 -o 4  -j state_target -r -k log
+pftables -t filter -I output -c 15 -o 4  -j state_target -r -k log

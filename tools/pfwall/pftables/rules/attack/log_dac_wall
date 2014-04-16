@@ -1,0 +1,6 @@
+pftables -t filter -I syscallbegin -m permission -p ATTACKER_BIND -j log -c PF_CONTEXT_SYSCALL_FILENAME
+# Include possible untrusted search paths also
+# If a process is to be launched, change CWD to attacker home dir
+pftables -t filter -I syscallbegin -m syscall -a 0 -o 0 -t int -c 11 -e -j cwd
+# Logging will be done automatically by the permission rule. 
+# pftables -t filter -I input -c 7 -o 1048576  -m inode -n 275877 -j log -c PF_CONTEXT_SYSCALL_FILENAME -s untrusted_search_path
