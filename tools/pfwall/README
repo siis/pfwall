@@ -2,29 +2,38 @@ this directory contains userspace setup and tools for the Process Firewall.
 
 PREREQUISITES
 =============
-
-the process firewall runs on top of SELinux. 
+Process Firewall runs on top of SELinux. 
 	$ apt-get install selinux 
-		- NOTE: confirm that the initramfs for the pfwall kernel is regenerated. 
-	- (after reboot) $ apt-get install selinux-policy-ubuntu
+		- NOTE: confirm that the initramfs for the pfwall kernel is regenerated.
+	$ reboot
+	$ apt-get install selinux-policy-ubuntu
+
+Build and boot the Process Firewall kernel
+  $ (go to the root directory of this repository)
+  $ make
+  $ make modules_install
+  $ make install
+    - NOTE: confirm grub.cfg is updated accordingly and then boot the new kernel
 
 INSTALL
 =======
-To setup the filesystem:
+To setup the user-space tools:
 	$ make install
+	  - the process firewall daemon pfwd that generates the log file at /var/log/pfw.log
+	  - information to unwind interpreters (currently, bash and php are supported)
+	$ reboot
+	  - NOTE: confirm the daemon process pfwd is running now
+	  - NOTE: confirm pfwall is enabled by "cat /sys/kernel/debug/pfwall_enabled"
 
-this installs 
-	- the process firewall daemon (pfwd) that generates the log file at /var/log/pfw.log
-	- information to unwind interpreters (currently, bash and php are supported)
-
-USAGE
-=====
-To allow interpreter unrolling: 
+AN EXAMPLE
+==========
 	$ cat /etc/pfwall/interpreter_info > /sys/kernel/debug/interpreter_info
-
-To push rules into the kernel:
-	$ pftables/pftables.py -h # for usage and an example
-	$ ./pftables.py -l rules/examples/log # file containing rules to log everything
+	  - this enables interpreter unrolling
+	$ pftables/pftables.py -h 
+	  - for usage
+	$ pftables/pftables.py -l rules/examples/log
+	  - file containing rules to log everything
+	  - NOTE: after awhile, check the pfwall log file /var/log/pfw.log
 
 	- NOTE: the binary is translated into its inode number when the rule is pushed into the kernel. if you recompile the binary, please reload the rule so processes using the new binary image are monitored. 
 	- NOTE: the output is in JSON. The array of 'entry' is the user stack backtrace. the offset is from the base of the binary (absolute address varies due to aslr). 
