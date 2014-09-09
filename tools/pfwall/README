@@ -13,7 +13,9 @@ Build and boot the Process Firewall kernel
   $ make
   $ make modules_install
   $ make install
-    - NOTE: confirm grub.cfg is updated accordingly and then boot the new kernel
+    - NOTE: confirm grub.cfg is updated accordingly
+  $ (boot the new kernel)
+    - NOTE: execute "uname -r" to check if the pfwall kernel is booted
 
 INSTALL
 =======
