@@ -10,6 +10,8 @@ Process Firewall runs on top of SELinux.
 
 Build and boot the Process Firewall kernel
   $ (go to the root directory of this repository)
+  $ make menuconfig
+    - NOTE: or you can use the current config: cp /boot/config-`uname -r` .config
   $ make
   $ make modules_install
   $ make install
