@@ -1,0 +1,254 @@
+
+/*== Overall Layout Parameters ====================================*/
+
+body {
+  margin-top: 0px;
+  margin-left: 0px;
+  margin-right: 0px;
+
+  background-color: #ffffff;
+  color: #000000;
+
+  font-family: times, Helvetica, sans-serif;
+  font-weight: normal;
+}
+ /* font-family: arial,Verdana,sans-serif,helvetica; */
+
+code {
+  font-family: "Lucida Sans", Monaco, Bitstream Vera Sans Mono, Lucida Console, Terminal;
+  font-size: 13px;
+  margin: 0 4px;
+  padding: 2px 6px;
+  -moz-border-radius: 2px;
+  -webkit-border-radius: 2px;
+  -o-border-radius: 2px;
+  -ms-border-radius: 2px;
+  -khtml-border-radius: 2px;
+  border-radius: 2px;
+}
+
+pre {
+  padding: 6px 18px;
+  -o-border-radius: 3px;
+  -ms-border-radius: 3px;
+  -khtml-border-radius: 3px;
+  border: 1px solid #c7c7c7;
+  overflow: auto;
+  overflow-y: hidden;
+}
+
+pre code {
+  margin: 0px;
+  padding: 0px;
+}
+
+pubs {
+  margin-top: 0px;
+  margin-left: 0px;
+  margin-right: 0px;
+
+  background-color: #ffffff;
+  color: #000000;
+
+  font-family: Verdana, Helvetica, sans-serif, Arial;
+  font-weight: normal;
+  font-size: 90%
+}
+
+/* begin from old CSS */
+P.TEXT {
+  font-size: 100%;
+}
+
+P.FOOTNOTE {
+  font-size: 75%;
+  color: #111111;
+}
+
+q {	
+	margin-top: 3ex;
+	margin-left: 3ex;
+	font-style: italic;
+}
+
+P {
+  font-size: 100%;
+}
+
+ol {
+  font-size: 100%;
+}
+
+ul {
+  font-size: 100%;
+}
+
+RAL { 
+  display: inline;
+  position: absolute;
+  text-align: right;
+}
+/* end from old CSS */
+
+h1 , h2 , h3 , h5 , h6 {
+  font-family : "Trebuchet MS", Verdana, "Lucida Sans", Arial, Geneva,
+                Helvetica, Helv, "Myriad Web", Syntax, sans-serif;
+  font-weight : normal; 
+}
+
+h3{
+  font-size: 100%;
+  color:#000000;
+  border-bottom:1px black solid;
+  margin-bottom: 0.5em;
+}
+
+h4 {
+  font-family: times, Helvetica, sans-serif;
+  font-weight: bold;
+  font-size: 100%;
+  color: #000000;
+  margin-bottom: 0.2em;
+}
+
+
+img.onleft
+{
+  float: left;
+  padding: 0em 1em 0.5em 0em;
+  border: 0;
+}
+
+img.onright
+{
+  float: right;
+  padding: 0em 0em 0.5em 1em;
+  border: 0;
+}
+
+.center { text-align : center; }
+
+.bio {
+  display: block;
+}
+
+/* links */
+a               { color: #0000FF; text-decoration: none; }
+a:active        { color: #333355; text-decoration: underline; }
+a:hover         { color: #333355; text-decoration: underline; }
+a:visited       { color: #0000FF; text-decoration: none; }
+a:visited:hover { color: #333355; text-decoration: underline; }
+
+a.name               { color: #0000FF; text-decoration: none; }
+a.name:active        { color: #333355; text-decoration: underline; }
+a.name:hover         { color: #333355; text-decoration: underline; }
+a.name:visited       { color: #0000FF; text-decoration: none; }
+a.name:visited:hover { color: #333355; text-decoration: underline; }
+
+hr {
+    border: none;
+    color: #000000;
+    background-color: #000000;
+    height: 1px;
+}
+
+/*== Banner =======================================================*/
+/*-- Banner Logo --*/
+.banner {
+  padding: 0px;
+  text-align: left;
+  vertical-align: middle;
+  background-color: #ffffff;
+}
+/*
+  padding: 3px;
+  background-color: #010066;
+  background-image: url("pics/web-banner.jpg");
+  background-repeat: no-repeat;
+  background-position: right bottom;
+}
+*/
+
+
+/*== Sidebar ======================================================*/
+.sidebar {
+  font-family: "Trebuchet MS", Verdana, "Lucida Sans", Arial, Geneva,
+                Helvetica, Helv, "Myriad Web", Syntax, sans-serif;
+  width: 125px;
+  text-align: left;
+  vertical-align: top;
+  padding-left: 0.5em;
+  padding-right: 0.75em;
+}
+
+#sidebar h3 {
+  font-size: 100%;
+  color: #010066;
+  border-bottom: 1px solid #010066;
+  margin-bottom: 0.5em;
+}
+
+#sidebar ul {
+  font-size: 100%;
+  margin-left: 10px;
+  list-style: none;
+  padding: 0px;
+  margin-bottom: 1em;
+  margin-top: 0em;
+}
+
+#sidebar li {
+  font-size: 75%;
+  margin-left: 0px;
+  list-style: none;
+  padding: 0px;
+}
+
+/* links */
+#sidebar a               { color: #010066; text-decoration: none; }
+#sidebar a:active        { color: #010066; text-decoration: underline; }
+#sidebar a:hover         { color: #010066; text-decoration: underline; }
+#sidebar a:visited       { color: #010066; text-decoration: none; }
+#sidebar a:visited:hover { color: #010066; text-decoration: underline; }
+
+/*== Logical Body =================================================*/
+.body {
+  text-align: left;
+  vertical-align: top;
+
+  padding-left: 0.75em;
+  padding-right: 0.5em;
+  
+  border-right: solid 1px #aaaaaa;
+  border-left: solid 1px #aaaaaa;
+}
+
+
+/*== Footer =======================================================*/
+.footer {
+  font-size: 75%;
+  color: #010066;
+  text-align: center;
+  padding-left: 2em;
+}
+
+P.QUOTE {
+  font-size: 90%;
+  font-style: italics;
+/*  font-family: Papyrus */
+}
+
+#footer hr {
+  width: 75%;
+  height: 1px;
+  background-color: #010066;
+  color: #010066;
+}
+
+
+/* links */
+#footer a               { color: #010066; text-decoration: none; }
+#footer a:active        { color: #010066; text-decoration: underline; }
+#footer a:hover         { color: #010066; text-decoration: underline; }
+#footer a:visited       { color: #010066; text-decoration: none; }
+#footer a:visited:hover { color: #010066; text-decoration: underline; }

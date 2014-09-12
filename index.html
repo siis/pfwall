@@ -1,109 +1,77 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Process Firewall by siis</title>
-    <link rel="stylesheet" href="stylesheets/styles.css">
-    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-    <script src="javascripts/main.js"></script>
-    <!--[if lt IE 9]>
-      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
+<!-- saved from url=(0047)http://siis.cse.psu.edu/sting/index.html#banner -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <link href="siis.css" rel="stylesheet" type="text/css">
+<title>Process Firewall</title>
   </head>
   <body>
+    <table width="800" bordercolor="#ffffff">
+      <tbody><tr>
+	<!-- Start Banner -->
+	<td id="banner" class="banner" colspan="2">
+	  <a href="http://siis.cse.psu.edu/"><img border="0" alt="SIIS Logo" src="siis-webhdr-full.jpg"></a>
+	</td>
+	<!-- End Banner -->
+	</tr><tr><!-- Start Sidebar -->
+	  <td id="sidebar" class="sidebar">
+		<h3>Process Firewall</h3>
+		<ul>
+			<li><a href="index.html">Home</a></li>
+			<li><a href="#">Vulnerabilities</a></li>
+			<li><a href="publications.html">Publications</a></li>
+			<li><a href="installation.html">Installation</a></li>
+		</ul>
+		<h3>Authors</h3>
+		<ul>
+			<li><a href="http://www.cse.psu.edu/~huv101">Hayawardh Vijayakumar</a></li>
+			<li><a href="http://www.joshschiffman.org/">Joshua Schiffman</a></li>
+			<li><a href="http://www.cse.psu.edu/~tjaeger">Trent Jaeger</a></li>
+		</ul>
+    </td>
 
-      <header>
-        <h1>Process Firewall</h1>
-        <p></p>
-      </header>
+<!-- Start Body -->
+<td class="body">
+    <h1 id="top">Process Firewall:<br>Protecting processes on your system</h1>
+<!--
+<p class="text">
+Name resolution converts names (e.g., <code> /etc/passwd </code>) into resources, such as files. However, adversaries share portions of the namespace with programs (e.g., <code> /tmp </code>), and attempt to exploit victim programs running at higher privileges. Two broad classes of exploits are <i> improper binding attacks </i> and <i> improper resource attacks </i>. </p>
 
-      <div id="banner">
-        <span id="logo"></span>
+In an improper binding attack, the adversary tricks a victim program into accessing a high-integrity (or secrecy) resource when it meant to access a low-integrity resource. Examples are symbolic link and hard link attacks. <br>
 
-        <a href="https://github.com/siis/pfwall" class="button fork"><strong>View On GitHub</strong></a>
-        <div class="downloads">
-          <span>Downloads:</span>
-          <ul>
-            <li><a href="https://github.com/siis/pfwall/zipball/pfwall-3.2" class="button">ZIP</a></li>
-            <li><a href="https://github.com/siis/pfwall/tarball/pfwall-3.2" class="button">TAR</a></li>
-          </ul>
-        </div>
-      </div><!-- end banner -->
+Example: Adversary links <code> /tmp/low_file </code> to <code> /etc/passwd </code>. Victim accesses <code> /tmp/low_file </code> but ends up with <code> /etc/passwd </code> <br>
+<br>
+In an improper resource attack, the adversary tricks a victim program into accessing a low-integrity resource when it meant to access a high-integrity resource. Examples are IPC/file squatting and untrusted search paths. <br>
 
-    <div class="wrapper">
-      <nav>
-        <ul></ul>
-      </nav>
-      <section>
-        <h3>
-<a name="what-is-process-firewall" class="anchor" href="#what-is-process-firewall"><span class="octicon octicon-link"></span></a>What is Process Firewall</h3>
+Example: Adversary creates a malicious library in his home directory and waits for a victim program that has an untrusted library search path to load it (perhaps by an administrator launching the program while in the adversary's home directory). <br>
 
-<p>Process Firewall is systematic solution to protect processes from resource access attacks without modifying the programs.</p>
+These attacks can also exploited through <i> time-of-check-to-time-of-use (TOCTTOU) race conditions </i>. Writing proper checks in programs to protect against these attacks is challenging for a variety of reasons. 
 
-<h3>
-<a name="how-to-build-process-firewall" class="anchor" href="#how-to-build-process-firewall"><span class="octicon octicon-link"></span></a>How to build Process Firewall</h3>
+<p>
+</p><h2 id="study">Finding Name Resolution Vulnerabilities</h2>
+sting is a grey-box system-wide online tester for finding such name resolution vulnerabilities in programs.  It does this by dynamically simulating adversarial actions on the system namespace, and evaluating a program's response. For example, if a program accesses <code> /tmp/low_file </code>, sting creates a symbolic link to <code> /etc/passwd </code> in its place (not exactly to <code> /etc/passwd </code>, but to another file having same properties). If the program later ends up writing to <code> /etc/passwd </code>, it is vulnerable. <p></p>
 
-<ul>
-<li>Install Ubuntu 12.04 (<a href="http://releases.ubuntu.com/12.04/">http://releases.ubuntu.com/12.04/</a>) on your virtual machine</li>
-<li>Build and boot the process firewall kernel</li>
-</ul><pre><code>$ make menuconfig
-  - NOTE: could also use /boot/config-`uname -r`
-$ make
-$ make modules_install
-$ make install
-$ (boot the new kernel)
-</code></pre>
+For more detail, see the <a href="http://siis.cse.psu.edu/sting/publications.html"> publications </a> page. <br>
+-->
 
-<ul>
-<li>Install SELinux-related stuff</li>
-</ul><pre><code>$ apt-get install selinux 
-  - NOTE: confirm that the initramfs for the pfwall kernel is regenerated.
-$ reboot
-$ apt-get install selinux-policy-ubuntu
-</code></pre>
+<h2 id="contact">Contact</h2>
+<p class="text">
+Please contact <a href="http://www.cse.psu.edu/~huv101/contact.html">Hayawardh Vijayakumar</a> for any questions about Process Firewall.
 
-<ul>
-<li>Install user-space tools</li>
-</ul><pre><code>$ cd tools/pfwall
-$ make install
-  - the process firewall daemon pfwd that generates the log file at /var/log/pfw.log
-  - information to unwind interpreters (currently, bash and php are supported)
-$ reboot
-  - NOTE: confirm the daemon process pfwd is running now
-  - NOTE: confirm pfwall is enabled by "cat /sys/kernel/debug/pfwall_enabled"
-</code></pre>
+</p>
 
-<ul>
-<li>Add an example rule to log all process activities</li>
-</ul><pre><code>$ cat /etc/pfwall/interpreter_info &gt; /sys/kernel/debug/interpreter_info
-  - this enables interpreter unrolling
-$ tools/pfwall/pftables/pftables.py -h 
-  - for usage
-$ tools/pfwall/pftables/pftables.py -l rules/examples/log
-  - file containing rules to log everything
-  - NOTE: after awhile, check the pfwall log file /var/log/pfw.log
-</code></pre>
+<h2 id="support">Support</h2>
+<p class="text">
+We gratefully acknowledge support from NSF grant XXXXXXX and AFOSR grant XXXXXX
+</p>
 
-<h3>
-<a name="publications" class="anchor" href="#publications"><span class="octicon octicon-link"></span></a>Publications</h3>
-
-<ol>
-<li>Hayawardh Vijayakumar, Xinyang Ge, Mathias Payer, and Trent Jaeger. Jigsaw: Protecting Resource Access by Inferring Programmer Expectations, <em>In Proceedings of the 23rd USENIX Security Symposium (USENIX Security)</em>
-</li>
-<li>Hayawardh Vijayakumar and Joshua Schiffman and Trent Jaeger, Process Firewalls: Protecting Processes During Resource Access, <em>In Proceedings of the 8th ACM European Conference on Computer Systems (EUROSYS 2013)</em>
-</li>
-</ol>
-      </section>
-      <footer>
-        <p>Project maintained by <a href="https://github.com/siis">siis</a></p>
-        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></small></p>
-      </footer>
-    </div>
-    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
-    
-  </body>
-</html>
+<!-- End Body -->
+</td></tr><tr></tr>
+	<!-- Start Footer -->
+	<tr> <td></td>
+		<td id="footer" class="footer">
+	<hr>
+		<a href="http://nsrc.cse.psu.edu/">NSRC</a> | <a href="http://siis.cse.psu.edu/">SIIS</a> |
+		<a href="http://www.cse.psu.edu/">CSE</a> | <a href="http://www.psu.edu/">Penn State</a> |
+		Copyright 2014 SIIS Lab</td>
+	</tr>
+	<!-- End Footer -->

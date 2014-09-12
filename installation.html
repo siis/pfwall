@@ -1,0 +1,85 @@
+
+<!-- saved from url=(0047)http://siis.cse.psu.edu/sting/index.html#banner -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <link href="siis.css" rel="stylesheet" type="text/css">
+<title>Process Firewall</title>
+  </head>
+  <body>
+    <table width="800" bordercolor="#ffffff">
+      <tbody><tr>
+	<!-- Start Banner -->
+	<td id="banner" class="banner" colspan="2">
+	  <a href="http://siis.cse.psu.edu/"><img border="0" alt="SIIS Logo" src="siis-webhdr-full.jpg"></a>
+	</td>
+	<!-- End Banner -->
+	</tr><tr><!-- Start Sidebar -->
+	  <td id="sidebar" class="sidebar">
+		<h3>Process Firewall</h3>
+		<ul>
+			<li><a href="index.html">Home</a></li>
+			<li><a href="#">Vulnerabilities</a></li>
+			<li><a href="publications.html">Publications</a></li>
+			<li><a href="installation.html">Installation</a></li>
+		</ul>
+		<h3>Authors</h3>
+		<ul>
+			<li><a href="http://www.cse.psu.edu/~huv101">Hayawardh Vijayakumar</a></li>
+			<li><a href="http://www.joshschiffman.org/">Joshua Schiffman</a></li>
+			<li><a href="http://www.cse.psu.edu/~tjaeger">Trent Jaeger</a></li>
+		</ul>
+    </td>
+
+<!-- Start Body -->
+<td class="body">
+    <h1 id="top">Process Firewall:<br>Protecting processes on your system</h1>
+
+<ol>
+<li>Install Ubuntu 12.04 (<a href="http://releases.ubuntu.com/12.04/">http://releases.ubuntu.com/12.04/</a>) on your virtual machine</li>
+<li>Build and boot the process firewall kernel</li>
+<pre><code>$ make menuconfig
+  - NOTE: could also use /boot/config-`uname -r`
+$ make
+$ make modules_install
+$ make install
+$ (boot the new kernel)
+</code></pre>
+
+<li>Install SELinux-related stuff</li>
+<pre><code>$ apt-get install selinux 
+  - NOTE: confirm that the initramfs for the pfwall kernel is regenerated.
+$ reboot
+$ apt-get install selinux-policy-ubuntu
+</code></pre>
+
+<li>Install user-space tools</li>
+<pre><code>$ cd tools/pfwall
+$ make install
+  - the process firewall daemon pfwd that generates the log file at /var/log/pfw.log
+  - information to unwind interpreters (currently, bash and php are supported)
+$ reboot
+  - NOTE: confirm the daemon process pfwd is running now
+  - NOTE: confirm pfwall is enabled by "cat /sys/kernel/debug/pfwall_enabled"
+</code></pre>
+
+<li>Add an example rule to log all process activities</li>
+<pre><code>$ cat /etc/pfwall/interpreter_info &gt; /sys/kernel/debug/interpreter_info
+  - this enables interpreter unrolling
+$ tools/pfwall/pftables/pftables.py -h 
+  - for usage
+$ tools/pfwall/pftables/pftables.py -l rules/examples/log
+  - file containing rules to log everything
+  - NOTE: after awhile, check the pfwall log file /var/log/pfw.log
+</code></pre>
+</ol>
+
+<!-- End Body -->
+</td></tr><tr></tr>
+	<!-- Start Footer -->
+	<tr> <td></td>
+		<td id="footer" class="footer">
+	<hr>
+		<a href="http://nsrc.cse.psu.edu/">NSRC</a> | <a href="http://siis.cse.psu.edu/">SIIS</a> |
+		<a href="http://www.cse.psu.edu/">CSE</a> | <a href="http://www.psu.edu/">Penn State</a> |
+		Copyright 2014 SIIS Lab</td>
+	</tr>
+	<!-- End Footer -->
